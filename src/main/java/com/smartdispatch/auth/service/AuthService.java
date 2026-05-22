@@ -3,6 +3,7 @@ package com.smartdispatch.auth.service;
 import com.smartdispatch.auth.dto.RegisterRequest;
 import com.smartdispatch.auth.entity.Role;
 import com.smartdispatch.auth.entity.User;
+import com.smartdispatch.auth.enums.RoleType;
 import com.smartdispatch.auth.repository.RoleRepository;
 import com.smartdispatch.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +26,7 @@ public class AuthService {
             throw new RuntimeException(("Email is "));
         }
 
-        Role role = roleRepository.findByName(request.getRole())
+        Role role = roleRepository.findByName(RoleType.valueOf(request.getRole()))
                 .orElseThrow(() -> new RuntimeException("Role not found"));
 
         User user = User.builder()

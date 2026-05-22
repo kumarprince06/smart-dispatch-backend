@@ -1,5 +1,6 @@
 package com.smartdispatch.auth.entity;
 
+import com.smartdispatch.auth.enums.RoleType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -16,8 +17,9 @@ public class Role {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Enumerated(EnumType.STRING)
     @Column(unique = true)
-    private  String name;
+    private RoleType name;
 
     private String description;
 
