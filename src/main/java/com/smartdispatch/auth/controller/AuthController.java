@@ -1,9 +1,6 @@
 package com.smartdispatch.auth.controller;
 
-import com.smartdispatch.auth.dto.AuthResponse;
-import com.smartdispatch.auth.dto.LoginRequest;
-import com.smartdispatch.auth.dto.LoginResponse;
-import com.smartdispatch.auth.dto.RegisterRequest;
+import com.smartdispatch.auth.dto.*;
 import com.smartdispatch.auth.service.AuthService;
 import com.smartdispatch.common.dto.ApiResponse;
 import jakarta.validation.Valid;
@@ -44,6 +41,19 @@ public class AuthController {
                 .message("Login successful")
                 .status(HttpStatus.OK.value())
                 .data(loginResponse)
+                .build();
+        return ResponseEntity.ok(apiResponse);
+    }
+
+    // Refresh Token Controller
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<RefreshTokenResponse>> refreshToken(@RequestBody RefreshTokenRequest request){
+        RefreshTokenResponse refreshTokenResponse = authService.refreshToken(request);
+        ApiResponse<RefreshTokenResponse> apiResponse = ApiResponse.<RefreshTokenResponse>builder()
+                .success(true)
+                .message("Token refreshed successfully")
+                .status(HttpStatus.OK.value())
+                .data(refreshTokenResponse)
                 .build();
         return ResponseEntity.ok(apiResponse);
     }

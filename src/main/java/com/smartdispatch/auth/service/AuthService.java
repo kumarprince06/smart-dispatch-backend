@@ -1,8 +1,6 @@
 package com.smartdispatch.auth.service;
 
-import com.smartdispatch.auth.dto.LoginRequest;
-import com.smartdispatch.auth.dto.LoginResponse;
-import com.smartdispatch.auth.dto.RegisterRequest;
+import com.smartdispatch.auth.dto.*;
 import com.smartdispatch.auth.entity.RefreshToken;
 import com.smartdispatch.auth.entity.Role;
 import com.smartdispatch.auth.entity.User;
@@ -101,5 +99,32 @@ public class AuthService {
                 .phoneNumber(user.getPhoneNo())
                 .refreshToken(refreshTokenValue)
                 .build();
+    }
+
+    public RefreshTokenResponse refreshToken(RefreshTokenRequest request) {
+
+         RefreshToken refreshToken = refreshTokenRepository.findByToken(request.getRefreshToken())
+            .orElseThrow(() ->
+                    new RuntimeException("Invalid refresh token"));
+
+    if(refreshToken.getRevoked()) {
+        throw new RuntimeException("Token revoked");
+    }
+
+    if(refreshToken.getExpiryDate()
+            .isBefore(LocalDateTime.now())) {
+
+        throw new RuntimeException("Refresh token expired");
+    }
+
+    String newAccessToken =
+            jwtService.generateToken(
+                    refreshToken.getUser().getEmail()
+            );
+
+    return RefreshTokenResponse.builder()
+            .accessToken(newAccessToken)
+            .refreshToken(refreshToken.getToken())
+            .build();
     }
 }

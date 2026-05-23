@@ -7,12 +7,10 @@ import lombok.Setter;
 @Getter
 @Setter
 @Builder
-public class AuthResponse {
+public class RefreshTokenResponse {
+
     private String accessToken;
+
     private String refreshToken;
-    private String email;
-    private String phoneNumber;
-    private String firstName;
-    private String lastName;
-    private String role;
+
 }
