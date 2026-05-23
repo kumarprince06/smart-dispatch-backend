@@ -1,13 +1,14 @@
 package com.smartdispatch.auth.service;
 
-import com.smartdispatch.auth.dto.AuthResponse;
 import com.smartdispatch.auth.dto.LoginRequest;
 import com.smartdispatch.auth.dto.LoginResponse;
 import com.smartdispatch.auth.dto.RegisterRequest;
+import com.smartdispatch.auth.entity.RefreshToken;
 import com.smartdispatch.auth.entity.Role;
 import com.smartdispatch.auth.entity.User;
 import com.smartdispatch.auth.enums.RoleType;
 import com.smartdispatch.auth.jwt.JwtService;
+import com.smartdispatch.auth.repository.RefreshTokenRepository;
 import com.smartdispatch.auth.repository.RoleRepository;
 import com.smartdispatch.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,12 +16,15 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
@@ -71,19 +75,31 @@ public class AuthService {
         //     throw new RuntimeException("Account is inactive");
         // }
 
-        String token = jwtService.generateToken(user.getEmail());
+        String accessToken = jwtService.generateToken(user.getEmail());
+
+        String refreshTokenValue =
+                jwtService.generateRefreshToken();
+
+        RefreshToken refreshToken = RefreshToken.builder()
+                .token(refreshTokenValue)
+                .user(user)
+                .expiryDate(LocalDateTime.now().plusDays(7))
+                .revoked(false)
+                .build();
+
+        refreshTokenRepository.save(refreshToken);
 
 
 //        log.info("User logged in successfully: {}", user.getEmail());
 
         return LoginResponse.builder()
-                .accessToken(token)
+                .accessToken(accessToken)
                 .email(user.getEmail())
                 .role(user.getRole().getName().name())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .phoneNumber(user.getPhoneNo())
-                .refreshToken(token)
+                .refreshToken(refreshTokenValue)
                 .build();
     }
 }
