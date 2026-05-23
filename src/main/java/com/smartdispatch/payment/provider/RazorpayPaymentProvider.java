@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 public class RazorpayPaymentProvider implements PaymentProvider {
 
     @Override
+    @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "razorpay", fallbackMethod = "fallbackPayment")
     public PaymentResult processPayment(Double amount, String customerId, String orderId) {
         // TODO: Integrate Razorpay SDK — create order, return payment link
         String txnId = "RZP-" + System.currentTimeMillis();
@@ -27,4 +28,9 @@ public class RazorpayPaymentProvider implements PaymentProvider {
 
     @Override
     public String getProviderName() { return "RAZORPAY"; }
+
+    public PaymentResult fallbackPayment(Double amount, String customerId, String orderId, Throwable t) {
+        log.error("[RAZORPAY] Circuit breaker tripped or execution failed: {}", t.getMessage());
+        throw new RuntimeException("Razorpay unavailable", t); // Triggers orchestrator fallback
+    }
 }

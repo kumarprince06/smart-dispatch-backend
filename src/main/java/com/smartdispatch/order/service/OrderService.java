@@ -10,6 +10,7 @@ import com.smartdispatch.driver.enums.DriverStatus;
 import com.smartdispatch.driver.repository.DriverRepository;
 import com.smartdispatch.driver.service.DriverService;
 import com.smartdispatch.exception.BadRequestException;
+import com.smartdispatch.pricing.service.PricingService;
 import com.smartdispatch.order.dto.*;
 import com.smartdispatch.order.entity.Order;
 import com.smartdispatch.order.entity.OrderTimeline;
@@ -47,6 +48,7 @@ public class OrderService {
     private final DriverService driverService;
     private final DispatchService dispatchService;
     private final TrackingService trackingService;
+    private final PricingService pricingService;
     private final OrderMapper orderMapper;
 
     // Valid state transitions (State Machine)
@@ -71,14 +73,14 @@ public class OrderService {
                 .orElseThrow(() -> new BadRequestException("Customer not found"));
 
         // Calculate distance
-        double distanceKm = calculateDistance(
+        double distanceKm = pricingService.calculateDistance(
                 request.getPickupLatitude(), request.getPickupLongitude(),
                 request.getDropLatitude(), request.getDropLongitude()
         );
 
         // Calculate fee
         OrderPriority priority = request.getPriority() != null ? request.getPriority() : OrderPriority.STANDARD;
-        double deliveryFee = calculateFee(distanceKm, priority, request.getPackageType());
+        double deliveryFee = pricingService.calculateFee(distanceKm, priority, request.getPackageType());
 
         // Generate OTPs
         String pickupOtp = generateOtp();
@@ -340,46 +342,6 @@ public class OrderService {
                     "Invalid status transition: " + current + " → " + next
             );
         }
-    }
-
-
-    // Haversine distance calculation (km)
-    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-        final int R = 6371;
-        double latDistance = Math.toRadians(lat2 - lat1);
-        double lonDistance = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    }
-
-    // Dynamic pricing: base + per km + priority multiplier
-    private double calculateFee(double distanceKm, OrderPriority priority, PackageType packageType) {
-        double baseFee = 30.0;
-        double perKmRate = 12.0;
-        double fee = baseFee + (perKmRate * distanceKm);
-
-        // Priority multiplier
-        switch (priority) {
-            case EXPRESS -> fee *= 1.5;
-            case URGENT -> fee *= 2.0;
-            default -> {} // STANDARD = 1x
-        }
-
-        // Package type surcharge
-        if (packageType != null) {
-            switch (packageType) {
-                case FRAGILE -> fee += 50.0;
-                case FURNITURE -> fee += 100.0;
-                case MEDICAL -> fee += 30.0;
-                case ELECTRONICS -> fee += 40.0;
-                default -> {}
-            }
-        }
-
-        return Math.round(fee * 100.0) / 100.0;
     }
 
     // Generate 4-digit OTP

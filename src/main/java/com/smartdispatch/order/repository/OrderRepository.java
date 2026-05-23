@@ -4,6 +4,7 @@ import com.smartdispatch.order.entity.Order;
 import com.smartdispatch.order.enums.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,19 +15,26 @@ import java.util.Optional;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
+    @EntityGraph(attributePaths = {"customer", "driver"})
     Optional<Order> findByTrackingNumber(String trackingNumber);
 
+    @EntityGraph(attributePaths = {"customer", "driver"})
     Page<Order> findByStatus(OrderStatus status, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"customer", "driver"})
     Page<Order> findByCustomerEmail(String email, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"customer", "driver"})
     Page<Order> findByDriverUserEmail(String email, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"customer", "driver"})
     Page<Order> findByCustomerEmailAndStatus(String email, OrderStatus status, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"customer", "driver"})
     Page<Order> findByDriverUserEmailAndStatus(String email, OrderStatus status, Pageable pageable);
 
     // Filtered listing with search
+    @EntityGraph(attributePaths = {"customer", "driver"})
     @Query("SELECT o FROM Order o WHERE " +
             "(:status IS NULL OR o.status = :status) AND " +
             "(:search IS NULL OR LOWER(o.trackingNumber) LIKE LOWER(CONCAT('%', :search, '%')) " +

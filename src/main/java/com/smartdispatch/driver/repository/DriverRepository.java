@@ -16,8 +16,10 @@ import java.util.Optional;
 
 public interface DriverRepository extends JpaRepository<Driver, Long> {
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user"})
     Optional<Driver> findByUserId(Long userId);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user"})
     Optional<Driver> findByUserEmail(String email);
 
     Boolean existsByVehicleNumber(String vehicleNumber);
@@ -27,12 +29,15 @@ public interface DriverRepository extends JpaRepository<Driver, Long> {
     Boolean existsByUserId(Long userId);
 
     // Find drivers by status
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user"})
     List<Driver> findByStatus(DriverStatus status);
 
     // Find available drivers by vehicle type
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user"})
     List<Driver> findByStatusAndVehicleType(DriverStatus status, VehicleType vehicleType);
 
     // Paginated listing with filters
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user"})
     @Query("SELECT d FROM Driver d WHERE " +
             "(:status IS NULL OR d.status = :status) AND " +
             "(:vehicleType IS NULL OR d.vehicleType = :vehicleType) AND " +
@@ -82,6 +87,7 @@ public interface DriverRepository extends JpaRepository<Driver, Long> {
     Long countByActiveTrue();
 
     // Find by status excluding soft-deleted drivers
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user"})
     Page<Driver> findByStatusAndActiveTrue(DriverStatus status, Pageable pageable);
 
     // Count by status only for active drivers

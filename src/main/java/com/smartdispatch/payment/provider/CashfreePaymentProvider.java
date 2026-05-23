@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 public class CashfreePaymentProvider implements PaymentProvider {
 
     @Override
+    @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "cashfree", fallbackMethod = "fallbackPayment")
     public PaymentResult processPayment(Double amount, String customerId, String orderId) {
         String txnId = "CF-" + System.currentTimeMillis();
         log.info("[CASHFREE] Payment of ₹{} initiated. TxnID: {}", amount, txnId);
@@ -26,4 +27,9 @@ public class CashfreePaymentProvider implements PaymentProvider {
 
     @Override
     public String getProviderName() { return "CASHFREE"; }
+
+    public PaymentResult fallbackPayment(Double amount, String customerId, String orderId, Throwable t) {
+        log.error("[CASHFREE] Circuit breaker tripped or execution failed: {}", t.getMessage());
+        throw new RuntimeException("Cashfree unavailable", t); // Triggers orchestrator fallback
+    }
 }

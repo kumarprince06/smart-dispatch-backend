@@ -34,6 +34,7 @@ public class DriverRetryService {
     private final DriverRepository driverRepository;
     private final DriverService driverService;
     private final DispatchService dispatchService;
+    private final org.redisson.api.RedissonClient redissonClient;
 
     private static final int ASSIGNMENT_TIMEOUT_SECONDS = 60; // Driver must accept within 60s
 
@@ -63,9 +64,24 @@ public class DriverRetryService {
                 continue;
             }
 
+            org.redisson.api.RLock lock = redissonClient.getLock("order-dispatch-lock:" + order.getId());
+            boolean isLocked = false;
             try {
+                // Try to acquire lock for 5 seconds, hold for 10 seconds max
+                isLocked = lock.tryLock(5, 10, java.util.concurrent.TimeUnit.SECONDS);
+                if (!isLocked) {
+                    log.debug("Order {} is currently being dispatched by another process. Skipping.", order.getId());
+                    continue;
+                }
+
+                // Double check status inside lock
+                Order lockedOrder = orderRepository.findById(order.getId()).orElse(order);
+                if (lockedOrder.getStatus() != OrderStatus.CREATED) {
+                     continue;
+                }
+
                 DispatchResult result = dispatchService.findNearestDriver(
-                        order.getPickupLatitude(), order.getPickupLongitude(),
+                        lockedOrder.getPickupLatitude(), lockedOrder.getPickupLongitude(),
                         DispatchStrategy.NEAREST
                 );
 
@@ -73,18 +89,18 @@ public class DriverRetryService {
                         .orElse(null);
 
                 if (driver != null) {
-                    order.setDriver(driver);
-                    order.setStatus(OrderStatus.ASSIGNED);
-                    order.setAssignedAt(LocalDateTime.now());
-                    order.setEstimatedDeliveryAt(LocalDateTime.now().plusMinutes(result.getEstimatedMinutes()));
-                    order.setAssignmentAttempts(order.getAssignmentAttempts() + 1);
-                    order.setLastAssignmentAttemptAt(LocalDateTime.now());
+                    lockedOrder.setDriver(driver);
+                    lockedOrder.setStatus(OrderStatus.ASSIGNED);
+                    lockedOrder.setAssignedAt(LocalDateTime.now());
+                    lockedOrder.setEstimatedDeliveryAt(LocalDateTime.now().plusMinutes(result.getEstimatedMinutes()));
+                    lockedOrder.setAssignmentAttempts(lockedOrder.getAssignmentAttempts() + 1);
+                    lockedOrder.setLastAssignmentAttemptAt(LocalDateTime.now());
 
                     driverService.incrementActiveOrders(driver.getId());
-                    orderRepository.save(order);
+                    orderRepository.save(lockedOrder);
 
                     log.info("Retry SUCCESS: Order {} assigned to driver {} (attempt {})",
-                            order.getId(), driver.getId(), order.getAssignmentAttempts());
+                            lockedOrder.getId(), driver.getId(), lockedOrder.getAssignmentAttempts());
                 }
             } catch (BadRequestException e) {
                 order.setAssignmentAttempts(order.getAssignmentAttempts() + 1);
@@ -94,6 +110,13 @@ public class DriverRetryService {
                 log.warn("Retry FAILED: Order {} — attempt {}/{}. Reason: {}",
                         order.getId(), order.getAssignmentAttempts(),
                         order.getMaxAssignmentAttempts(), e.getMessage());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.error("Lock interrupted for order {}", order.getId(), e);
+            } finally {
+                if (isLocked && lock.isHeldByCurrentThread()) {
+                    lock.unlock();
+                }
             }
         }
     }
@@ -109,9 +132,21 @@ public class DriverRetryService {
         List<Order> scheduledOrders = orderRepository.findScheduledOrdersDue(LocalDateTime.now());
 
         for (Order order : scheduledOrders) {
+            org.redisson.api.RLock lock = redissonClient.getLock("order-dispatch-lock:" + order.getId());
+            boolean isLocked = false;
             try {
+                isLocked = lock.tryLock(5, 10, java.util.concurrent.TimeUnit.SECONDS);
+                if (!isLocked) {
+                     continue;
+                }
+
+                Order lockedOrder = orderRepository.findById(order.getId()).orElse(order);
+                if (lockedOrder.getStatus() != OrderStatus.CREATED) {
+                     continue;
+                }
+
                 DispatchResult result = dispatchService.findNearestDriver(
-                        order.getPickupLatitude(), order.getPickupLongitude(),
+                        lockedOrder.getPickupLatitude(), lockedOrder.getPickupLongitude(),
                         DispatchStrategy.NEAREST
                 );
 
@@ -119,20 +154,27 @@ public class DriverRetryService {
                         .orElse(null);
 
                 if (driver != null) {
-                    order.setDriver(driver);
-                    order.setStatus(OrderStatus.ASSIGNED);
-                    order.setAssignedAt(LocalDateTime.now());
-                    order.setEstimatedDeliveryAt(LocalDateTime.now().plusMinutes(result.getEstimatedMinutes()));
+                    lockedOrder.setDriver(driver);
+                    lockedOrder.setStatus(OrderStatus.ASSIGNED);
+                    lockedOrder.setAssignedAt(LocalDateTime.now());
+                    lockedOrder.setEstimatedDeliveryAt(LocalDateTime.now().plusMinutes(result.getEstimatedMinutes()));
 
                     driverService.incrementActiveOrders(driver.getId());
-                    orderRepository.save(order);
+                    orderRepository.save(lockedOrder);
 
                     log.info("Scheduled order {} dispatched to driver {}",
-                            order.getId(), driver.getId());
+                            lockedOrder.getId(), driver.getId());
                 }
             } catch (BadRequestException e) {
                 log.warn("Scheduled order {} — no driver available: {}",
                         order.getId(), e.getMessage());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.error("Lock interrupted for scheduled order {}", order.getId(), e);
+            } finally {
+                if (isLocked && lock.isHeldByCurrentThread()) {
+                    lock.unlock();
+                }
             }
         }
     }

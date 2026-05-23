@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 public class StripePaymentProvider implements PaymentProvider {
 
     @Override
+    @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "stripe", fallbackMethod = "fallbackPayment")
     public PaymentResult processPayment(Double amount, String customerId, String orderId) {
         // TODO: Integrate Stripe SDK — create PaymentIntent
         String txnId = "STR-" + System.currentTimeMillis();
@@ -27,4 +28,9 @@ public class StripePaymentProvider implements PaymentProvider {
 
     @Override
     public String getProviderName() { return "STRIPE"; }
+
+    public PaymentResult fallbackPayment(Double amount, String customerId, String orderId, Throwable t) {
+        log.error("[STRIPE] Circuit breaker tripped or execution failed: {}", t.getMessage());
+        throw new RuntimeException("Stripe unavailable", t); // Triggers orchestrator fallback
+    }
 }

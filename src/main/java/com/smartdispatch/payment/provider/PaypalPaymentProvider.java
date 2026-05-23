@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 public class PaypalPaymentProvider implements PaymentProvider {
 
     @Override
+    @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "paypal", fallbackMethod = "fallbackPayment")
     public PaymentResult processPayment(Double amount, String customerId, String orderId) {
         String txnId = "PPL-" + System.currentTimeMillis();
         log.info("[PAYPAL] Payment of ${} initiated. TxnID: {}", amount, txnId);
@@ -26,4 +27,9 @@ public class PaypalPaymentProvider implements PaymentProvider {
 
     @Override
     public String getProviderName() { return "PAYPAL"; }
+
+    public PaymentResult fallbackPayment(Double amount, String customerId, String orderId, Throwable t) {
+        log.error("[PAYPAL] Circuit breaker tripped or execution failed: {}", t.getMessage());
+        throw new RuntimeException("PayPal unavailable", t); // Triggers orchestrator fallback
+    }
 }
