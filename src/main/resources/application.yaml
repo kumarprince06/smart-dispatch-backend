@@ -20,6 +20,14 @@ spring:
 
   kafka:
     bootstrap-servers: localhost:9002
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
 
   jwt:
     secret: dfgrthfsfwet34dsfbfhfhwrt54tfds45ddsgdfg5yt45dgdgdeqrgdfhgjsewrwtreyrtutndfdsfsdfet45t4dgdfg4w5t45yrtgdset455ydfgdfgwrw45

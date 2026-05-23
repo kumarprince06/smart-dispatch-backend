@@ -18,9 +18,9 @@ import com.smartdispatch.order.enums.OrderPriority;
 import com.smartdispatch.order.enums.OrderStatus;
 import com.smartdispatch.order.enums.PackageType;
 import com.smartdispatch.order.mapper.OrderMapper;
+import com.smartdispatch.kafka.event.OrderEvent;
+import com.smartdispatch.kafka.producer.OrderEventProducer;
 import com.smartdispatch.order.repository.OrderRepository;
-import com.smartdispatch.tracking.dto.OrderStatusMessage;
-import com.smartdispatch.tracking.service.TrackingService;
 import com.smartdispatch.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +47,7 @@ public class OrderService {
     private final DriverRepository driverRepository;
     private final DriverService driverService;
     private final DispatchService dispatchService;
-    private final TrackingService trackingService;
+    private final OrderEventProducer orderEventProducer;
     private final PricingService pricingService;
     private final OrderMapper orderMapper;
 
@@ -245,8 +245,8 @@ public class OrderService {
 
         log.info("Order {} status updated to {}", orderId, request.getStatus());
 
-        // 🔴 REAL-TIME: Broadcast status change via WebSocket
-        broadcastStatusChange(updated);
+        // 🔴 REAL-TIME: Publish event to Kafka
+        publishOrderEvent(updated);
 
         return orderMapper.toResponse(updated);
     }
@@ -362,8 +362,8 @@ public class OrderService {
         orderRepository.save(order);
     }
 
-    // Broadcast order status change via WebSocket
-    private void broadcastStatusChange(Order order) {
+    // Publish order status change to Kafka Event Bus
+    private void publishOrderEvent(Order order) {
         String humanMessage = switch (order.getStatus()) {
             case CREATED -> "Your order has been placed!";
             case ASSIGNED -> "A driver has been assigned to your order";
@@ -374,10 +374,14 @@ public class OrderService {
             case FAILED -> "Delivery failed. We'll retry soon.";
         };
 
-        OrderStatusMessage.OrderStatusMessageBuilder builder = OrderStatusMessage.builder()
+        OrderEvent.OrderEventBuilder builder = OrderEvent.builder()
+                .eventId(java.util.UUID.randomUUID().toString())
                 .orderId(order.getId())
                 .trackingNumber(order.getTrackingNumber())
-                .status(order.getStatus().name())
+                .status(order.getStatus())
+                .customerEmail(order.getCustomer() != null ? order.getCustomer().getEmail() : null)
+                .customerName(order.getCustomer() != null ? order.getCustomer().getFirstName() : null)
+                .timestamp(LocalDateTime.now())
                 .message(humanMessage);
 
         if (order.getDriver() != null) {
@@ -387,7 +391,7 @@ public class OrderService {
                     .driverLongitude(order.getDriver().getCurrentLongitude());
         }
 
-        trackingService.broadcastOrderStatus(builder.build());
+        orderEventProducer.publishOrderEvent(builder.build());
     }
 }
 
