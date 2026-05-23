@@ -24,14 +24,19 @@ public class AuthController {
 
     // Register User Controller
     @PostMapping("/register")
-    public String register(@Valid @RequestBody RegisterRequest request){
-        return authService.register(request);
+    public ResponseEntity<ApiResponse<Void>> register(@Valid @RequestBody RegisterRequest request) {
+        authService.register(request);
+        ApiResponse<Void> apiResponse = ApiResponse.<Void>builder()
+                .success(true)
+                .message("Your account has been created successfully. Please Login to continue.")
+                .status(HttpStatus.CREATED.value())
+                .build();
+        return ResponseEntity.status(HttpStatus.CREATED).body(apiResponse);
     }
-
 
     // Login User Controller
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request){
+    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
 
         LoginResponse loginResponse = authService.login(request);
         ApiResponse<LoginResponse> apiResponse = ApiResponse.<LoginResponse>builder()
@@ -40,6 +45,6 @@ public class AuthController {
                 .status(HttpStatus.OK.value())
                 .data(loginResponse)
                 .build();
-        return  ResponseEntity.ok(apiResponse);
+        return ResponseEntity.ok(apiResponse);
     }
 }
