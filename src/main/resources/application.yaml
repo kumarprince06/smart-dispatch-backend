@@ -20,3 +20,7 @@ spring:
 
   kafka:
     bootstrap-servers: localhost:9002
+
+  jwt:
+    secret: dfgrthfsfwet34dsfbfhfhwrt54tfds45ddsgdfg5yt45dgdgdeqrgdfhgjsewrwtreyrtutndfdsfsdfet45t4dgdfg4w5t45yrtgdset455ydfgdfgwrw45
+    expiration: 86400000
