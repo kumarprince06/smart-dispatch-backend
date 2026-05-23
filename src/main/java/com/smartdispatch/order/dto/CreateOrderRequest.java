@@ -47,6 +47,12 @@ public class CreateOrderRequest {
     // Priority
     private OrderPriority priority;
 
+    // Scheduling (null = immediate delivery)
+    private String scheduledAt; // ISO format: "2026-05-25T10:00:00"
+
+    // Coupon
+    private String couponCode;
+
     // Notes
     private String customerNotes;
 }

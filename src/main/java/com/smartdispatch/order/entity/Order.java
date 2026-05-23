@@ -100,6 +100,21 @@ public class Order {
 
     private Double distanceKm;
 
+    @Builder.Default
+    private Double surgeMultiplier = 1.0;
+
+    private String couponCode;
+
+    private Double discountAmount;
+
+    // ═══════════════════════════════════════════
+    // Scheduling
+    // ═══════════════════════════════════════════
+    @Builder.Default
+    private Boolean isScheduled = false;
+
+    private LocalDateTime scheduledAt; // null = immediate, set = future delivery
+
     // ═══════════════════════════════════════════
     // OTP Verification
     // ═══════════════════════════════════════════
@@ -148,6 +163,17 @@ public class Order {
     private LocalDateTime cancelledAt;
 
     private LocalDateTime estimatedDeliveryAt;
+
+    // ═══════════════════════════════════════════
+    // Driver Assignment Retry
+    // ═══════════════════════════════════════════
+    @Builder.Default
+    private Integer assignmentAttempts = 0;
+
+    @Builder.Default
+    private Integer maxAssignmentAttempts = 3;
+
+    private LocalDateTime lastAssignmentAttemptAt;
 
     private LocalDateTime createdAt;
 

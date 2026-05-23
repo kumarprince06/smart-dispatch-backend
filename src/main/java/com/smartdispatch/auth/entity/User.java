@@ -103,15 +103,15 @@ public class User {
     // ═══════════════════════════════════════════
     // Account Status
     // ═══════════════════════════════════════════
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private Boolean emailVerified = false;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private Boolean phoneVerified = false;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "boolean default true")
     @Builder.Default
     private Boolean active = true;
 

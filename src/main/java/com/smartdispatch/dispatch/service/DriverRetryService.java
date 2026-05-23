@@ -1,0 +1,139 @@
+package com.smartdispatch.dispatch.service;
+
+import com.smartdispatch.dispatch.dto.DispatchResult;
+import com.smartdispatch.dispatch.enums.DispatchStrategy;
+import com.smartdispatch.driver.service.DriverService;
+import com.smartdispatch.exception.BadRequestException;
+import com.smartdispatch.order.entity.Order;
+import com.smartdispatch.order.enums.OrderStatus;
+import com.smartdispatch.order.repository.OrderRepository;
+import com.smartdispatch.driver.entity.Driver;
+import com.smartdispatch.driver.repository.DriverRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * Driver Retry Service.
+ * When a driver rejects or doesn't respond within timeout,
+ * automatically re-assigns to the next best driver.
+ *
+ * Also handles scheduled order dispatch.
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class DriverRetryService {
+
+    private final OrderRepository orderRepository;
+    private final DriverRepository driverRepository;
+    private final DriverService driverService;
+    private final DispatchService dispatchService;
+
+    private static final int ASSIGNMENT_TIMEOUT_SECONDS = 60; // Driver must accept within 60s
+
+    // ═══════════════════════════════════════════
+    // Retry: Re-assign unaccepted orders
+    // Runs every 30 seconds
+    // ═══════════════════════════════════════════
+    @Scheduled(fixedDelay = 30000)
+    @Transactional
+    public void retryUnassignedOrders() {
+        // Find orders stuck in CREATED status
+        List<Order> unassigned = orderRepository.findByStatus(
+                OrderStatus.CREATED,
+                org.springframework.data.domain.PageRequest.of(0, 50)
+        ).getContent();
+
+        for (Order order : unassigned) {
+            if (order.getAssignmentAttempts() >= order.getMaxAssignmentAttempts()) {
+                log.warn("Order {} exceeded max assignment attempts ({}). Needs manual review.",
+                        order.getId(), order.getMaxAssignmentAttempts());
+                continue;
+            }
+
+            // Skip if not enough time since last attempt
+            if (order.getLastAssignmentAttemptAt() != null &&
+                    order.getLastAssignmentAttemptAt().plusSeconds(ASSIGNMENT_TIMEOUT_SECONDS).isAfter(LocalDateTime.now())) {
+                continue;
+            }
+
+            try {
+                DispatchResult result = dispatchService.findNearestDriver(
+                        order.getPickupLatitude(), order.getPickupLongitude(),
+                        DispatchStrategy.NEAREST
+                );
+
+                Driver driver = driverRepository.findById(result.getDriverId())
+                        .orElse(null);
+
+                if (driver != null) {
+                    order.setDriver(driver);
+                    order.setStatus(OrderStatus.ASSIGNED);
+                    order.setAssignedAt(LocalDateTime.now());
+                    order.setEstimatedDeliveryAt(LocalDateTime.now().plusMinutes(result.getEstimatedMinutes()));
+                    order.setAssignmentAttempts(order.getAssignmentAttempts() + 1);
+                    order.setLastAssignmentAttemptAt(LocalDateTime.now());
+
+                    driverService.incrementActiveOrders(driver.getId());
+                    orderRepository.save(order);
+
+                    log.info("Retry SUCCESS: Order {} assigned to driver {} (attempt {})",
+                            order.getId(), driver.getId(), order.getAssignmentAttempts());
+                }
+            } catch (BadRequestException e) {
+                order.setAssignmentAttempts(order.getAssignmentAttempts() + 1);
+                order.setLastAssignmentAttemptAt(LocalDateTime.now());
+                orderRepository.save(order);
+
+                log.warn("Retry FAILED: Order {} — attempt {}/{}. Reason: {}",
+                        order.getId(), order.getAssignmentAttempts(),
+                        order.getMaxAssignmentAttempts(), e.getMessage());
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    // Scheduled Order Dispatcher
+    // Runs every 60 seconds — dispatches orders
+    // whose scheduledAt time has arrived
+    // ═══════════════════════════════════════════
+    @Scheduled(fixedDelay = 60000)
+    @Transactional
+    public void dispatchScheduledOrders() {
+        List<Order> scheduledOrders = orderRepository.findScheduledOrdersDue(LocalDateTime.now());
+
+        for (Order order : scheduledOrders) {
+            try {
+                DispatchResult result = dispatchService.findNearestDriver(
+                        order.getPickupLatitude(), order.getPickupLongitude(),
+                        DispatchStrategy.NEAREST
+                );
+
+                Driver driver = driverRepository.findById(result.getDriverId())
+                        .orElse(null);
+
+                if (driver != null) {
+                    order.setDriver(driver);
+                    order.setStatus(OrderStatus.ASSIGNED);
+                    order.setAssignedAt(LocalDateTime.now());
+                    order.setEstimatedDeliveryAt(LocalDateTime.now().plusMinutes(result.getEstimatedMinutes()));
+
+                    driverService.incrementActiveOrders(driver.getId());
+                    orderRepository.save(order);
+
+                    log.info("Scheduled order {} dispatched to driver {}",
+                            order.getId(), driver.getId());
+                }
+            } catch (BadRequestException e) {
+                log.warn("Scheduled order {} — no driver available: {}",
+                        order.getId(), e.getMessage());
+            }
+        }
+    }
+}
