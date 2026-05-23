@@ -1,5 +1,6 @@
 package com.smartdispatch.config;
 
+import com.smartdispatch.auth.security.JwtAccessDeniedHandler;
 import com.smartdispatch.auth.security.JwtAuthenticationEntryPoint;
 import com.smartdispatch.auth.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+    private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
 
     @Bean
     public SecurityFilterChain securityFilterChain(
@@ -59,9 +61,9 @@ public class SecurityConfig {
                 )
 
                 .exceptionHandling(exception ->
-                        exception.authenticationEntryPoint(
-                                jwtAuthenticationEntryPoint
-                        )
+                        exception
+                                .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                                .accessDeniedHandler(jwtAccessDeniedHandler)
                 )
 
                 .addFilterBefore(

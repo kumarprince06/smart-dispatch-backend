@@ -2,6 +2,7 @@ package com.smartdispatch.exception;
 
 import com.smartdispatch.common.dto.ApiResponse;
 import org.springframework.http.*;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -9,6 +10,20 @@ import org.springframework.web.bind.annotation.*;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    // Handle Access Denied (403)
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(
+            AccessDeniedException ex
+    ) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                ApiResponse.<Void>builder()
+                        .success(false)
+                        .message("Access denied. You do not have permission to perform this action.")
+                        .status(HttpStatus.FORBIDDEN.value())
+                        .build()
+        );
+    }
 
     // Handle custom BadRequestException
     @ExceptionHandler(BadRequestException.class)

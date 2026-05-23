@@ -36,6 +36,14 @@ public class User {
     @JoinColumn(name = "role_id")
     private Role role;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean emailVerified = false;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean active = true;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
