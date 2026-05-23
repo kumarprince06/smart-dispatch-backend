@@ -127,4 +127,18 @@ public class AuthService {
             .refreshToken(refreshToken.getToken())
             .build();
     }
+
+    // Logout — Revoke Refresh Token
+    public void logout(String refreshTokenValue) {
+
+        RefreshToken refreshToken =
+                refreshTokenRepository.findByToken(
+                        refreshTokenValue
+                ).orElseThrow(() ->
+                        new RuntimeException("Token not found"));
+
+        refreshToken.setRevoked(true);
+
+        refreshTokenRepository.save(refreshToken);
+    }
 }
