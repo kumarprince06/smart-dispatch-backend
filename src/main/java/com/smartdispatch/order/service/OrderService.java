@@ -18,6 +18,8 @@ import com.smartdispatch.order.enums.OrderStatus;
 import com.smartdispatch.order.enums.PackageType;
 import com.smartdispatch.order.mapper.OrderMapper;
 import com.smartdispatch.order.repository.OrderRepository;
+import com.smartdispatch.tracking.dto.OrderStatusMessage;
+import com.smartdispatch.tracking.service.TrackingService;
 import com.smartdispatch.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +46,7 @@ public class OrderService {
     private final DriverRepository driverRepository;
     private final DriverService driverService;
     private final DispatchService dispatchService;
+    private final TrackingService trackingService;
     private final OrderMapper orderMapper;
 
     // Valid state transitions (State Machine)
@@ -240,6 +243,9 @@ public class OrderService {
 
         log.info("Order {} status updated to {}", orderId, request.getStatus());
 
+        // 🔴 REAL-TIME: Broadcast status change via WebSocket
+        broadcastStatusChange(updated);
+
         return orderMapper.toResponse(updated);
     }
 
@@ -393,4 +399,33 @@ public class OrderService {
         order.getTimeline().add(timeline);
         orderRepository.save(order);
     }
+
+    // Broadcast order status change via WebSocket
+    private void broadcastStatusChange(Order order) {
+        String humanMessage = switch (order.getStatus()) {
+            case CREATED -> "Your order has been placed!";
+            case ASSIGNED -> "A driver has been assigned to your order";
+            case PICKED_UP -> "Your package has been picked up!";
+            case IN_TRANSIT -> "Your package is on the way!";
+            case DELIVERED -> "Your package has been delivered!";
+            case CANCELLED -> "Your order has been cancelled";
+            case FAILED -> "Delivery failed. We'll retry soon.";
+        };
+
+        OrderStatusMessage.OrderStatusMessageBuilder builder = OrderStatusMessage.builder()
+                .orderId(order.getId())
+                .trackingNumber(order.getTrackingNumber())
+                .status(order.getStatus().name())
+                .message(humanMessage);
+
+        if (order.getDriver() != null) {
+            builder.driverName(order.getDriver().getUser().getFirstName() + " " + order.getDriver().getUser().getLastName())
+                    .vehicleNumber(order.getDriver().getVehicleNumber())
+                    .driverLatitude(order.getDriver().getCurrentLatitude())
+                    .driverLongitude(order.getDriver().getCurrentLongitude());
+        }
+
+        trackingService.broadcastOrderStatus(builder.build());
+    }
 }
+

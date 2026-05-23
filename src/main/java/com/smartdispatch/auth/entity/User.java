@@ -36,14 +36,99 @@ public class User {
     @JoinColumn(name = "role_id")
     private Role role;
 
+    // ═══════════════════════════════════════════
+    // Profile
+    // ═══════════════════════════════════════════
+    private String profilePictureUrl;
+
+    private String gender; // MALE, FEMALE, OTHER
+
+    private String dateOfBirth;
+
+    // ═══════════════════════════════════════════
+    // Default Address (for quick order)
+    // ═══════════════════════════════════════════
+    private String defaultAddress;
+
+    private String city;
+
+    private String state;
+
+    private String pincode;
+
+    private Double defaultLatitude;
+
+    private Double defaultLongitude;
+
+    // ═══════════════════════════════════════════
+    // Wallet & Payment
+    // ═══════════════════════════════════════════
+    @Builder.Default
+    private Double walletBalance = 0.0;
+
+    // ═══════════════════════════════════════════
+    // Loyalty & Engagement
+    // ═══════════════════════════════════════════
+    @Builder.Default
+    private Integer loyaltyPoints = 0;
+
+    @Builder.Default
+    private Integer totalOrders = 0;
+
+    @Builder.Default
+    private Integer totalSpent = 0; // in rupees
+
+    // ═══════════════════════════════════════════
+    // Preferences
+    // ═══════════════════════════════════════════
+    private String preferredLanguage;
+
+    @Builder.Default
+    private Boolean notificationsEnabled = true;
+
+    @Builder.Default
+    private Boolean smsEnabled = true;
+
+    // ═══════════════════════════════════════════
+    // Referral System
+    // ═══════════════════════════════════════════
+    @Column(unique = true)
+    private String referralCode;
+
+    private String referredBy; // referral code of the person who referred
+
+    @Builder.Default
+    private Integer referralCount = 0;
+
+    // ═══════════════════════════════════════════
+    // Account Status
+    // ═══════════════════════════════════════════
     @Column(nullable = false)
     @Builder.Default
     private Boolean emailVerified = false;
 
     @Column(nullable = false)
     @Builder.Default
+    private Boolean phoneVerified = false;
+
+    @Column(nullable = false)
+    @Builder.Default
     private Boolean active = true;
 
+    private String deactivationReason;
+
+    // ═══════════════════════════════════════════
+    // Login & Security Tracking
+    // ═══════════════════════════════════════════
+    private LocalDateTime lastLoginAt;
+
+    private String lastLoginIp;
+
+    private String lastLoginDevice;
+
+    // ═══════════════════════════════════════════
+    // Audit
+    // ═══════════════════════════════════════════
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
