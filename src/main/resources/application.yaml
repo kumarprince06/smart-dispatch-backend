@@ -15,7 +15,7 @@ spring:
     show-sql: true
 
   redis:
-    hostname: localhost
+    host: localhost
     port: 6379
 
   kafka:

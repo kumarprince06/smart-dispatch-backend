@@ -2,6 +2,9 @@ package com.smartdispatch.order.service;
 
 import com.smartdispatch.auth.entity.User;
 import com.smartdispatch.auth.repository.UserRepository;
+import com.smartdispatch.dispatch.dto.DispatchResult;
+import com.smartdispatch.dispatch.enums.DispatchStrategy;
+import com.smartdispatch.dispatch.service.DispatchService;
 import com.smartdispatch.driver.entity.Driver;
 import com.smartdispatch.driver.enums.DriverStatus;
 import com.smartdispatch.driver.repository.DriverRepository;
@@ -40,6 +43,7 @@ public class OrderService {
     private final UserRepository userRepository;
     private final DriverRepository driverRepository;
     private final DriverService driverService;
+    private final DispatchService dispatchService;
     private final OrderMapper orderMapper;
 
     // Valid state transitions (State Machine)
@@ -102,18 +106,26 @@ public class OrderService {
                 .status(OrderStatus.CREATED)
                 .build();
 
-        // Try auto-assign driver
+        // Try auto-assign driver via Redis GEO Dispatch Engine
         try {
-            Driver driver = findBestAvailableDriver(request.getPickupLatitude(), request.getPickupLongitude());
+            DispatchResult result = dispatchService.findNearestDriver(
+                    request.getPickupLatitude(), request.getPickupLongitude(),
+                    DispatchStrategy.NEAREST
+            );
+
+            Driver driver = driverRepository.findById(result.getDriverId())
+                    .orElseThrow(() -> new BadRequestException("Driver not found"));
+
             order.setDriver(driver);
             order.setStatus(OrderStatus.ASSIGNED);
             order.setAssignedAt(LocalDateTime.now());
-            order.setEstimatedDeliveryAt(LocalDateTime.now().plusMinutes((long)(distanceKm * 4)));
+            order.setEstimatedDeliveryAt(LocalDateTime.now().plusMinutes(result.getEstimatedMinutes()));
 
             // Update driver state
             driverService.incrementActiveOrders(driver.getId());
 
-            log.info("Order auto-assigned to driver ID: {}", driver.getId());
+            log.info("Order auto-assigned via dispatch engine. Driver: {}, Distance: {}km, Time: {}ms",
+                    result.getDriverId(), result.getDistanceKm(), result.getDispatchTimeMs());
         } catch (BadRequestException e) {
             // No driver available — order stays CREATED
             log.warn("No available driver for order. Status remains CREATED.");
@@ -324,19 +336,6 @@ public class OrderService {
         }
     }
 
-    // Find best available driver (nearest verified + available)
-    private Driver findBestAvailableDriver(Double lat, Double lng) {
-        List<Driver> nearbyDrivers = driverRepository.findNearbyAvailableDrivers(lat, lng, 10.0);
-        if (nearbyDrivers.isEmpty()) {
-            // Fallback: any available driver
-            List<Driver> available = driverRepository.findByStatus(DriverStatus.AVAILABLE);
-            if (available.isEmpty()) {
-                throw new BadRequestException("No drivers available at the moment");
-            }
-            return available.get(0);
-        }
-        return nearbyDrivers.get(0); // Nearest driver
-    }
 
     // Haversine distance calculation (km)
     private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {

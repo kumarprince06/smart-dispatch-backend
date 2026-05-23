@@ -2,6 +2,7 @@ package com.smartdispatch.driver.service;
 
 import com.smartdispatch.auth.entity.User;
 import com.smartdispatch.auth.repository.UserRepository;
+import com.smartdispatch.dispatch.service.GeoLocationService;
 import com.smartdispatch.driver.dto.*;
 import com.smartdispatch.driver.entity.Driver;
 import com.smartdispatch.driver.enums.*;
@@ -29,6 +30,7 @@ public class DriverService {
     private final DriverRepository driverRepository;
     private final UserRepository userRepository;
     private final DriverMapper driverMapper;
+    private final GeoLocationService geoLocationService;
 
     // ═══════════════════════════════════════════
     // Onboard New Driver
@@ -193,6 +195,13 @@ public class DriverService {
             driver.setLastActiveAt(LocalDateTime.now());
         }
 
+        // Sync to Redis: remove from geo index when going offline/break/suspended
+        if (request.getStatus() == DriverStatus.OFFLINE
+                || request.getStatus() == DriverStatus.SUSPENDED
+                || request.getStatus() == DriverStatus.BLOCKED) {
+            geoLocationService.removeDriver(id);
+        }
+
         Driver updated = driverRepository.save(driver);
         log.info("Driver status updated. ID: {}, Status: {}", id, request.getStatus());
 
@@ -210,6 +219,9 @@ public class DriverService {
         driver.setCurrentLongitude(request.getLongitude());
         driver.setLocationUpdatedAt(LocalDateTime.now());
         driver.setLastActiveAt(LocalDateTime.now());
+
+        // Sync to Redis GEO (real-time cache)
+        geoLocationService.updateDriverLocation(id, request.getLatitude(), request.getLongitude());
 
         Driver updated = driverRepository.save(driver);
 
