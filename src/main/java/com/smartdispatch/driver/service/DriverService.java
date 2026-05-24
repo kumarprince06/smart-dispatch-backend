@@ -12,6 +12,8 @@ import com.smartdispatch.exception.BadRequestException;
 import com.smartdispatch.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -66,9 +68,11 @@ public class DriverService {
     }
 
     // ═══════════════════════════════════════════
-    // Get Driver by ID
+    // Get Driver by ID (CACHED — 10 minute TTL)
     // ═══════════════════════════════════════════
+    @Cacheable(value = "drivers", key = "#id")
     public DriverResponse getDriverById(Long id) {
+        log.info("Cache MISS: Loading driver {} from database", id);
         Driver driver = findDriverOrThrow(id);
         return driverMapper.toResponse(driver);
     }
@@ -105,6 +109,7 @@ public class DriverService {
     // Update Driver Profile
     // ═══════════════════════════════════════════
     @Transactional
+    @CacheEvict(value = "drivers", key = "#id")
     public DriverResponse updateDriver(Long id, UpdateDriverRequest request) {
         Driver driver = findDriverOrThrow(id);
 
@@ -162,6 +167,7 @@ public class DriverService {
     // Soft Delete Driver
     // ═══════════════════════════════════════════
     @Transactional
+    @CacheEvict(value = "drivers", key = "#id")
     public void deleteDriver(Long id) {
         Driver driver = findDriverOrThrow(id);
         driver.setActive(false);
@@ -174,6 +180,7 @@ public class DriverService {
     // Update Driver Status
     // ═══════════════════════════════════════════
     @Transactional
+    @CacheEvict(value = "drivers", key = "#id")
     public DriverResponse updateDriverStatus(Long id, UpdateDriverStatusRequest request) {
         Driver driver = findDriverOrThrow(id);
 
@@ -344,6 +351,7 @@ public class DriverService {
     // Update Driver Rating (weighted average)
     // ═══════════════════════════════════════════
     @Transactional
+    @CacheEvict(value = "drivers", key = "#driverId")
     public void updateDriverRating(Long driverId, Double newRating) {
         if (newRating < 1 || newRating > 5) {
             throw new BadRequestException("Rating must be between 1 and 5");
@@ -368,6 +376,7 @@ public class DriverService {
     // Increment Active Orders
     // ═══════════════════════════════════════════
     @Transactional
+    @CacheEvict(value = "drivers", key = "#driverId")
     public void incrementActiveOrders(Long driverId) {
         Driver driver = findDriverOrThrow(driverId);
         driver.setActiveOrderCount(driver.getActiveOrderCount() + 1);
@@ -384,6 +393,7 @@ public class DriverService {
     // Decrement Active Orders
     // ═══════════════════════════════════════════
     @Transactional
+    @CacheEvict(value = "drivers", key = "#driverId")
     public void decrementActiveOrders(Long driverId) {
         Driver driver = findDriverOrThrow(driverId);
         driver.setActiveOrderCount(Math.max(0, driver.getActiveOrderCount() - 1));

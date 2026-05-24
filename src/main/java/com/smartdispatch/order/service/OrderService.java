@@ -24,6 +24,8 @@ import com.smartdispatch.order.repository.OrderRepository;
 import com.smartdispatch.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -66,6 +68,7 @@ public class OrderService {
     // Create Order
     // ═══════════════════════════════════════════
     @Transactional
+    @CacheEvict(value = "order-stats", allEntries = true)
     public OrderResponse createOrder(CreateOrderRequest request) {
 
         String email = SecurityUtil.getCurrentUserEmail();
@@ -203,6 +206,7 @@ public class OrderService {
     // Update Order Status (State Machine)
     // ═══════════════════════════════════════════
     @Transactional
+    @CacheEvict(value = "order-stats", allEntries = true)
     public OrderResponse updateOrderStatus(Long orderId, UpdateOrderStatusRequest request) {
         Order order = findOrderOrThrow(orderId);
 
@@ -255,6 +259,7 @@ public class OrderService {
     // Cancel Order
     // ═══════════════════════════════════════════
     @Transactional
+    @CacheEvict(value = "order-stats", allEntries = true)
     public void cancelOrder(Long orderId, CancelOrderRequest request) {
         Order order = findOrderOrThrow(orderId);
 
@@ -312,7 +317,9 @@ public class OrderService {
     // ═══════════════════════════════════════════
     // Order Stats (Admin)
     // ═══════════════════════════════════════════
+    @Cacheable(value = "order-stats", key = "'dashboard'")
     public OrderStatsResponse getOrderStats() {
+        log.info("Cache MISS: Loading order stats from database");
         return OrderStatsResponse.builder()
                 .totalOrders(orderRepository.count())
                 .createdOrders(orderRepository.countByStatus(OrderStatus.CREATED))
