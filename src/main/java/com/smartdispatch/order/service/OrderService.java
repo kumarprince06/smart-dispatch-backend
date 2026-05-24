@@ -10,6 +10,7 @@ import com.smartdispatch.driver.enums.DriverStatus;
 import com.smartdispatch.driver.repository.DriverRepository;
 import com.smartdispatch.driver.service.DriverService;
 import com.smartdispatch.exception.BadRequestException;
+import com.smartdispatch.geofence.service.GeofenceService;
 import com.smartdispatch.pricing.service.PricingService;
 import com.smartdispatch.order.dto.*;
 import com.smartdispatch.order.entity.Order;
@@ -50,6 +51,7 @@ public class OrderService {
     private final DriverService driverService;
     private final DispatchService dispatchService;
     private final OrderEventProducer orderEventProducer;
+    private final GeofenceService geofenceService;
     private final PricingService pricingService;
     private final OrderMapper orderMapper;
 
@@ -75,15 +77,27 @@ public class OrderService {
         User customer = userRepository.findByEmail(email)
                 .orElseThrow(() -> new BadRequestException("Customer not found"));
 
+        // Validate Geofence Zones (Ensure pickup & drop are in service areas)
+        geofenceService.validateOrderLocations(
+                request.getPickupLatitude(), request.getPickupLongitude(),
+                request.getDropLatitude(), request.getDropLongitude()
+        );
+
+        // Get Zone-based surge multiplier
+        Double pickupMultiplier = geofenceService.getZoneMultiplier(request.getPickupLatitude(), request.getPickupLongitude());
+        Double dropMultiplier = geofenceService.getZoneMultiplier(request.getDropLatitude(), request.getDropLongitude());
+        Double activeSurgeMultiplier = Math.max(pickupMultiplier, dropMultiplier); // Take the higher surge
+
         // Calculate distance
         double distanceKm = pricingService.calculateDistance(
                 request.getPickupLatitude(), request.getPickupLongitude(),
                 request.getDropLatitude(), request.getDropLongitude()
         );
 
-        // Calculate fee
+        // Calculate fee (Base * Surge)
         OrderPriority priority = request.getPriority() != null ? request.getPriority() : OrderPriority.STANDARD;
-        double deliveryFee = pricingService.calculateFee(distanceKm, priority, request.getPackageType());
+        double baseFee = pricingService.calculateFee(distanceKm, priority, request.getPackageType());
+        double deliveryFee = baseFee * activeSurgeMultiplier;
 
         // Generate OTPs
         String pickupOtp = generateOtp();
@@ -112,6 +126,10 @@ public class OrderService {
                 .deliveryOtp(deliveryOtp)
                 .customerNotes(request.getCustomerNotes())
                 .status(OrderStatus.CREATED)
+                .isScheduled(request.getScheduledAt() != null && !request.getScheduledAt().trim().isEmpty())
+                .scheduledAt(request.getScheduledAt() != null && !request.getScheduledAt().trim().isEmpty() 
+                        ? LocalDateTime.parse(request.getScheduledAt()) : null)
+                .surgeMultiplier(activeSurgeMultiplier)
                 .build();
 
         // Try auto-assign driver via Redis GEO Dispatch Engine
