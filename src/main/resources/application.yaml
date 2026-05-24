@@ -38,6 +38,18 @@ spring:
     secret: dfgrthfsfwet34dsfbfhfhwrt54tfds45ddsgdfg5yt45dgdgdeqrgdfhgjsewrwtreyrtutndfdsfsdfet45t4dgdfg4w5t45yrtgdset455ydfgdfgwrw45
     expiration: 86400000
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: sharma.princekumar0611@gmail.com
+    password: yevfjswycnzhenbh
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - [%X{correlationId}] - %msg%n"

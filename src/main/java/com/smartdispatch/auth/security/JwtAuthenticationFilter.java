@@ -45,35 +45,37 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter{
         // Extract JWT
         jwt = authHeader.substring(7);
 
-        // Extract Email
-        userEmail = jwtService.extractEmail(jwt);
+        try {
+            // Extract Email
+            userEmail = jwtService.extractEmail(jwt);
 
-        // Authenticate User
-        if(userEmail != null &&
-                SecurityContextHolder.getContext()
-                        .getAuthentication() == null) {
+            // Authenticate User
+            if(userEmail != null &&
+                    SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            UserDetails userDetails =
-                    userDetailsService.loadUserByUsername(userEmail);
+                UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
 
-            // Validate Token
-            if(jwtService.isTokenValid(jwt, userDetails.getUsername())) {
+                // Validate Token
+                if(jwtService.isTokenValid(jwt, userDetails.getUsername())) {
 
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities()
-                        );
+                    UsernamePasswordAuthenticationToken authToken =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails.getAuthorities()
+                            );
 
-                authToken.setDetails(
-                        new WebAuthenticationDetailsSource()
-                                .buildDetails(request)
-                );
+                    authToken.setDetails(
+                            new WebAuthenticationDetailsSource().buildDetails(request)
+                    );
 
-                SecurityContextHolder.getContext()
-                        .setAuthentication(authToken);
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
+        } catch (Exception e) {
+            // Token is invalid, expired, or malformed.
+            // We do not throw an exception here because we want to allow permitAll() endpoints to proceed anonymously.
+            // Secured endpoints will naturally be blocked later by Spring Security if the context is null.
         }
 
         filterChain.doFilter(request, response);

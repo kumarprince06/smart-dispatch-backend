@@ -105,12 +105,13 @@ public class AuthService {
 
         String refreshTokenValue = jwtService.generateRefreshToken();
 
-        RefreshToken refreshToken = RefreshToken.builder()
-                .token(refreshTokenValue)
-                .user(user)
-                .expiryDate(LocalDateTime.now().plusDays(7))
-                .revoked(false)
-                .build();
+        RefreshToken refreshToken = refreshTokenRepository.findByUser_Id(user.getId())
+                .orElse(new RefreshToken());
+
+        refreshToken.setToken(refreshTokenValue);
+        refreshToken.setUser(user);
+        refreshToken.setExpiryDate(LocalDateTime.now().plusDays(7));
+        refreshToken.setRevoked(false);
 
         refreshTokenRepository.save(refreshToken);
 
