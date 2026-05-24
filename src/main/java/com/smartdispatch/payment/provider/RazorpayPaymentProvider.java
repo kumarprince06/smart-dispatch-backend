@@ -1,6 +1,7 @@
 package com.smartdispatch.payment.provider;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -10,6 +11,15 @@ import org.springframework.stereotype.Component;
 @Component("razorpayProvider")
 @Slf4j
 public class RazorpayPaymentProvider implements PaymentProvider {
+
+    @Value("${payment.razorpay.key-id:mock_rzp_key_id}")
+    private String keyId;
+
+    @Value("${payment.razorpay.key-secret:mock_rzp_key_secret}")
+    private String keySecret;
+
+    @Value("${payment.razorpay.webhook-secret:mock_rzp_webhook}")
+    private String webhookSecret;
 
     @Override
     @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "razorpay", fallbackMethod = "fallbackPayment")

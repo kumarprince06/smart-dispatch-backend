@@ -1,6 +1,7 @@
 package com.smartdispatch.payment.provider;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -10,6 +11,15 @@ import org.springframework.stereotype.Component;
 @Component("stripeProvider")
 @Slf4j
 public class StripePaymentProvider implements PaymentProvider {
+
+    @Value("${payment.stripe.public-key:mock_pk_stripe}")
+    private String publicKey;
+
+    @Value("${payment.stripe.secret-key:mock_sk_stripe}")
+    private String secretKey;
+
+    @Value("${payment.stripe.webhook-secret:mock_wh_stripe}")
+    private String webhookSecret;
 
     @Override
     @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "stripe", fallbackMethod = "fallbackPayment")

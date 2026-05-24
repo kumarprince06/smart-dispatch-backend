@@ -42,6 +42,16 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - [%X{correlationId}] - %msg%n"
 
+payment:
+  stripe:
+    public-key: pk_test_51MockStripeKey123
+    secret-key: sk_test_51MockStripeSecret456
+    webhook-secret: whsec_MockStripeWebhook789
+  razorpay:
+    key-id: rzp_test_MockRazorpayKey
+    key-secret: MockRazorpaySecretKey999
+    webhook-secret: mock_razorpay_webhook_secret
+
 resilience4j:
   circuitbreaker:
     configs:
