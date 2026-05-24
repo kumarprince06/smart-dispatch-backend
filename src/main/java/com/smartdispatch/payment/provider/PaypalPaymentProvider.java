@@ -1,6 +1,7 @@
 package com.smartdispatch.payment.provider;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -10,6 +11,12 @@ import org.springframework.stereotype.Component;
 @Component("paypalProvider")
 @Slf4j
 public class PaypalPaymentProvider implements PaymentProvider {
+
+    @Value("${payment.paypal.client-id:mock_paypal_client_id}")
+    private String clientId;
+
+    @Value("${payment.paypal.client-secret:mock_paypal_client_secret}")
+    private String clientSecret;
 
     @Override
     @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "paypal", fallbackMethod = "fallbackPayment")

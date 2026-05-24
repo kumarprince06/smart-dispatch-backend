@@ -1,6 +1,7 @@
 package com.smartdispatch.payment.provider;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -10,6 +11,12 @@ import org.springframework.stereotype.Component;
 @Component("cashfreeProvider")
 @Slf4j
 public class CashfreePaymentProvider implements PaymentProvider {
+
+    @Value("${payment.cashfree.app-id:mock_cashfree_app_id}")
+    private String appId;
+
+    @Value("${payment.cashfree.secret-key:mock_cashfree_secret_key}")
+    private String secretKey;
 
     @Override
     @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "cashfree", fallbackMethod = "fallbackPayment")

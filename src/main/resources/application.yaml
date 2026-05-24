@@ -51,6 +51,12 @@ payment:
     key-id: rzp_test_MockRazorpayKey
     key-secret: MockRazorpaySecretKey999
     webhook-secret: mock_razorpay_webhook_secret
+  paypal:
+    client-id: mock_paypal_client_id_test
+    client-secret: mock_paypal_client_secret_test
+  cashfree:
+    app-id: mock_cashfree_app_id_test
+    secret-key: mock_cashfree_secret_key_test
 
 resilience4j:
   circuitbreaker:
