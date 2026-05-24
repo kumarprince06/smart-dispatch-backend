@@ -71,7 +71,7 @@
 		<!-- Distributed Locking (Redisson) -->
 		<dependency>
 			<groupId>org.redisson</groupId>
-			<artifactId>redisson-spring-boot-starter</artifactId>
+			<artifactId>redisson</artifactId>
 			<version>3.28.0</version>
 		</dependency>
 
@@ -80,6 +80,16 @@
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-circuitbreaker-resilience4j</artifactId>
 			<version>3.1.1</version>
+		</dependency>
+
+		<!-- Database Migrations (Flyway) -->
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
 		</dependency>
 
 		<dependency>

@@ -1,32 +1,47 @@
 package com.smartdispatch.kafka.producer;
 
-import com.smartdispatch.config.KafkaConfig;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartdispatch.kafka.event.OrderEvent;
+import com.smartdispatch.kafka.outbox.OutboxEvent;
+import com.smartdispatch.kafka.outbox.OutboxEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.concurrent.CompletableFuture;
+import java.time.LocalDateTime;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class OrderEventProducer {
 
-    private final KafkaTemplate<String, OrderEvent> kafkaTemplate;
+    private final OutboxEventRepository outboxEventRepository;
+    private final ObjectMapper objectMapper;
 
+    // Must run within the same transaction as the caller (OrderService)
+    @Transactional(propagation = Propagation.REQUIRED)
     public void publishOrderEvent(OrderEvent event) {
-        CompletableFuture<SendResult<String, OrderEvent>> future = 
-            kafkaTemplate.send(KafkaConfig.ORDER_EVENTS_TOPIC, event.getOrderId().toString(), event);
-
-        future.whenComplete((result, ex) -> {
-            if (ex == null) {
-                log.debug("Sent event for order=[{}] with offset=[{}]", event.getOrderId(), result.getRecordMetadata().offset());
-            } else {
-                log.error("Unable to send event for order=[{}] due to : {}", event.getOrderId(), ex.getMessage());
-            }
-        });
+        try {
+            String payload = objectMapper.writeValueAsString(event);
+            
+            OutboxEvent outboxEvent = OutboxEvent.builder()
+                    .aggregateType("Order")
+                    .aggregateId(event.getOrderId().toString())
+                    .type("OrderLifecycleEvent")
+                    .payload(payload)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+                    
+            outboxEventRepository.save(outboxEvent);
+            log.debug("Saved OrderEvent to outbox table for orderId=[{}]", event.getOrderId());
+            
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize OrderEvent for outbox: {}", e.getMessage());
+            throw new RuntimeException("Failed to serialize event", e);
+        }
     }
 }
