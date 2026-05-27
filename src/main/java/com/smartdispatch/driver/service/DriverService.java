@@ -7,11 +7,15 @@ import com.smartdispatch.driver.dto.*;
 import com.smartdispatch.driver.entity.Driver;
 import com.smartdispatch.driver.enums.*;
 import com.smartdispatch.driver.mapper.DriverMapper;
+import com.smartdispatch.auth.entity.Role;
+import com.smartdispatch.auth.enums.RoleType;
+import com.smartdispatch.auth.repository.RoleRepository;
 import com.smartdispatch.driver.repository.DriverRepository;
 import com.smartdispatch.exception.BadRequestException;
 import com.smartdispatch.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -31,6 +35,8 @@ public class DriverService {
 
     private final DriverRepository driverRepository;
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final BCryptPasswordEncoder passwordEncoder;
     private final DriverMapper driverMapper;
     private final GeoLocationService geoLocationService;
 
@@ -63,6 +69,87 @@ public class DriverService {
         Driver savedDriver = driverRepository.save(driver);
 
         log.info("Driver onboarded successfully. ID: {}, User: {}", savedDriver.getId(), user.getEmail());
+
+        return driverMapper.toResponse(savedDriver);
+    }
+
+    // ═══════════════════════════════════════════
+    // Admin Onboard Driver (Creates User + Driver)
+    // ═══════════════════════════════════════════
+    @Transactional
+    public DriverResponse adminOnboardDriver(AdminOnboardDriverRequest request) {
+        
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BadRequestException("Email is already registered. Cannot create driver.");
+        }
+
+        if (driverRepository.existsByVehicleNumber(request.getVehicleNumber())) {
+            throw new BadRequestException("Vehicle number already registered: " + request.getVehicleNumber());
+        }
+
+        if (driverRepository.existsByLicenseNumber(request.getLicenseNumber())) {
+            throw new BadRequestException("License number already registered: " + request.getLicenseNumber());
+        }
+
+        // Create User
+        Role role = roleRepository.findByName(RoleType.DRIVER)
+                .orElseThrow(() -> new BadRequestException("Role DRIVER not found"));
+
+        User user = User.builder()
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .email(request.getEmail())
+                .phoneNo(request.getPhoneNo())
+                // Use a default temporary password for admin onboarded drivers
+                .password(passwordEncoder.encode("Welcome@123"))
+                .role(role)
+                .build();
+
+        user = userRepository.save(user);
+
+        // Map request to CreateDriverRequest manually or map to Driver entity directly
+        Driver driver = Driver.builder()
+                .user(user)
+                .profilePictureUrl(request.getProfilePictureUrl())
+                .dateOfBirth(request.getDateOfBirth())
+                .address(request.getAddress())
+                .city(request.getCity())
+                .state(request.getState())
+                .pincode(request.getPincode())
+                .emergencyContactName(request.getEmergencyContactName())
+                .emergencyContactPhone(request.getEmergencyContactPhone())
+                .vehicleType(request.getVehicleType())
+                .vehicleNumber(request.getVehicleNumber())
+                .vehicleModel(request.getVehicleModel())
+                .vehicleColor(request.getVehicleColor())
+                .vehicleYear(request.getVehicleYear())
+                .vehicleCapacityKg(request.getVehicleCapacityKg())
+                .licenseNumber(request.getLicenseNumber())
+                .licenseExpiry(request.getLicenseExpiry())
+                .preferredZone(request.getPreferredZone())
+                .serviceRadiusKm(request.getServiceRadiusKm())
+                .maxConcurrentOrders(request.getMaxConcurrentOrders() != null ? request.getMaxConcurrentOrders() : 3)
+                .skillTags(request.getSkillTags())
+                .status(DriverStatus.OFFLINE)
+                .verificationStatus(VerificationStatus.PENDING)
+                .tier(DriverTier.BRONZE)
+                .active(true)
+                .rating(0.0)
+                .totalRatings(0)
+                .totalDeliveries(0)
+                .totalTrips(0)
+                .totalEarnings(0.0)
+                .walletBalance(0.0)
+                .acceptanceRate(100.0)
+                .completionRate(100.0)
+                .onTimeRate(100.0)
+                .performanceScore(100.0)
+                .activeOrderCount(0)
+                .build();
+
+        Driver savedDriver = driverRepository.save(driver);
+
+        log.info("Admin successfully onboarded new driver. ID: {}, User: {}", savedDriver.getId(), user.getEmail());
 
         return driverMapper.toResponse(savedDriver);
     }

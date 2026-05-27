@@ -38,6 +38,25 @@ public class DriverController {
     }
 
     // ═══════════════════════════════════════════
+    // Admin Onboard New Driver (Creates User + Driver)
+    // ═══════════════════════════════════════════
+    @PostMapping("/admin/onboard")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<DriverResponse>> adminOnboardDriver(
+            @Valid @RequestBody AdminOnboardDriverRequest request
+    ) {
+        DriverResponse driver = driverService.adminOnboardDriver(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                ApiResponse.<DriverResponse>builder()
+                        .success(true)
+                        .message("Driver onboarded successfully via admin panel")
+                        .status(HttpStatus.CREATED.value())
+                        .data(driver)
+                        .build()
+        );
+    }
+
+    // ═══════════════════════════════════════════
     // Get Driver by ID
     // ═══════════════════════════════════════════
     @GetMapping("/{id}")
