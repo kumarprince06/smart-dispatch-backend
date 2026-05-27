@@ -172,6 +172,26 @@ public class OrderController {
     }
 
     // ═══════════════════════════════════════════
+    // Manually Assign Driver (Admin)
+    // ═══════════════════════════════════════════
+    @PostMapping("/{id}/assign")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<OrderResponse>> manuallyAssignDriver(
+            @PathVariable Long id,
+            @Valid @RequestBody AssignDriverRequest request
+    ) {
+        OrderResponse order = orderService.manuallyAssignDriver(id, request);
+        return ResponseEntity.ok(
+                ApiResponse.<OrderResponse>builder()
+                        .success(true)
+                        .message("Driver manually assigned to order")
+                        .status(HttpStatus.OK.value())
+                        .data(order)
+                        .build()
+        );
+    }
+
+    // ═══════════════════════════════════════════
     // Rate Order (Customer)
     // ═══════════════════════════════════════════
     @PostMapping("/{id}/rate")

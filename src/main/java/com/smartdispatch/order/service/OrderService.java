@@ -225,6 +225,40 @@ public class OrderService {
     }
 
     // ═══════════════════════════════════════════
+    // Manually Assign Driver (Admin)
+    // ═══════════════════════════════════════════
+    @Transactional
+    public OrderResponse manuallyAssignDriver(Long orderId, AssignDriverRequest request) {
+        Order order = findOrderOrThrow(orderId);
+
+        if (order.getStatus() != OrderStatus.CREATED) {
+            throw new BadRequestException("Only CREATED orders can be manually assigned. Current status: " + order.getStatus());
+        }
+
+        Driver driver = driverRepository.findById(request.getDriverId())
+                .orElseThrow(() -> new BadRequestException("Driver not found"));
+        
+        order.setDriver(driver);
+        order.setStatus(OrderStatus.ASSIGNED);
+        order.setAssignedAt(LocalDateTime.now());
+
+        // Update driver state
+        driverService.incrementActiveOrders(request.getDriverId());
+
+        Order savedOrder = orderRepository.save(order);
+
+        // Add timeline entry
+        addTimelineEntry(savedOrder, OrderStatus.ASSIGNED, "Driver assigned manually by Admin", SecurityUtil.getCurrentUserEmail());
+
+        log.info("Order {} manually assigned to driver {}", order.getTrackingNumber(), request.getDriverId());
+
+        // Publish events
+        publishOrderEvent(savedOrder);
+
+        return orderMapper.toResponse(savedOrder);
+    }
+
+    // ═══════════════════════════════════════════
     // Update Order Status (State Machine)
     // ═══════════════════════════════════════════
     @Transactional
