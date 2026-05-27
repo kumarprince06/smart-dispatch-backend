@@ -191,7 +191,11 @@ public class OrderService {
                                             OrderStatus status, String search) {
         Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return orderRepository.findAllWithFilters(status, search, pageable).map(orderMapper::toResponse);
+        
+        // Prevent Postgres bytea lower() error by passing empty string instead of null
+        String safeSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : "";
+        
+        return orderRepository.findAllWithFilters(status, safeSearch, pageable).map(orderMapper::toResponse);
     }
 
     // ═══════════════════════════════════════════

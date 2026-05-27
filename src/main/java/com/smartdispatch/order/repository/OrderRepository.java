@@ -37,7 +37,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @EntityGraph(attributePaths = {"customer", "driver"})
     @Query("SELECT o FROM Order o WHERE " +
             "(:status IS NULL OR o.status = :status) AND " +
-            "(:search IS NULL OR LOWER(o.trackingNumber) LIKE LOWER(CONCAT('%', :search, '%')) " +
+            "(:search = '' OR LOWER(o.trackingNumber) LIKE LOWER(CONCAT('%', :search, '%')) " +
             "OR LOWER(o.pickupAddress) LIKE LOWER(CONCAT('%', :search, '%')) " +
             "OR LOWER(o.dropAddress) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<Order> findAllWithFilters(
