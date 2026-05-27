@@ -44,7 +44,7 @@ public interface DriverRepository extends JpaRepository<Driver, Long> {
             "(:verificationStatus IS NULL OR d.verificationStatus = :verificationStatus) AND " +
             "(:tier IS NULL OR d.tier = :tier) AND " +
             "(:active IS NULL OR d.active = :active) AND " +
-            "(:search IS NULL OR LOWER(d.user.firstName) LIKE LOWER(CONCAT('%', :search, '%')) " +
+            "(:search = '' OR LOWER(d.user.firstName) LIKE LOWER(CONCAT('%', :search, '%')) " +
             "OR LOWER(d.user.lastName) LIKE LOWER(CONCAT('%', :search, '%')) " +
             "OR LOWER(d.user.email) LIKE LOWER(CONCAT('%', :search, '%')) " +
             "OR LOWER(d.vehicleNumber) LIKE LOWER(CONCAT('%', :search, '%')))")

@@ -98,8 +98,10 @@ public class DriverService {
 
         Pageable pageable = PageRequest.of(page, size, sort);
 
+        String safeSearch = search == null ? "" : search.trim();
+        
         Page<Driver> drivers = driverRepository.findAllWithFilters(
-                status, vehicleType, verificationStatus, tier, active, search, pageable
+                status, vehicleType, verificationStatus, tier, active, safeSearch, pageable
         );
 
         return drivers.map(driverMapper::toResponse);
