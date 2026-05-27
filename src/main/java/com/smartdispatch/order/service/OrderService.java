@@ -339,9 +339,8 @@ public class OrderService {
     // ═══════════════════════════════════════════
     // Order Stats (Admin)
     // ═══════════════════════════════════════════
-    @Cacheable(value = "order-stats", key = "'dashboard'")
     public OrderStatsResponse getOrderStats() {
-        log.info("Cache MISS: Loading order stats from database");
+        log.info("Loading order stats from database");
         return OrderStatsResponse.builder()
                 .totalOrders(orderRepository.count())
                 .createdOrders(orderRepository.countByStatus(OrderStatus.CREATED))
