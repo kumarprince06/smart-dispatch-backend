@@ -21,6 +21,9 @@ import com.smartdispatch.order.enums.PackageType;
 import com.smartdispatch.order.mapper.OrderMapper;
 import com.smartdispatch.kafka.event.OrderEvent;
 import com.smartdispatch.kafka.producer.OrderEventProducer;
+import com.smartdispatch.notification.service.NotificationService;
+import com.smartdispatch.notification.enums.NotificationTemplate;
+import com.smartdispatch.notification.enums.NotificationType;
 import com.smartdispatch.order.repository.OrderRepository;
 import com.smartdispatch.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +56,7 @@ public class OrderService {
     private final OrderEventProducer orderEventProducer;
     private final GeofenceService geofenceService;
     private final PricingService pricingService;
+    private final NotificationService notificationService;
     private final OrderMapper orderMapper;
 
     // Valid state transitions (State Machine)
@@ -164,6 +168,22 @@ public class OrderService {
 
         log.info("Order created. ID: {}, Tracking: {}", savedOrder.getId(), savedOrder.getTrackingNumber());
 
+        // Send Push Notification if assigned
+        if (savedOrder.getStatus() == OrderStatus.ASSIGNED && savedOrder.getDriver() != null) {
+            String fcmToken = savedOrder.getDriver().getUser().getFcmToken() != null 
+                              ? savedOrder.getDriver().getUser().getFcmToken() 
+                              : savedOrder.getDriver().getUser().getId().toString();
+            notificationService.sendNotification(
+                    savedOrder.getDriver().getUser().getId(),
+                    fcmToken,
+                    NotificationTemplate.DRIVER_ASSIGNED_NEW_ORDER,
+                    NotificationType.PUSH,
+                    "/orders/" + savedOrder.getId(),
+                    savedOrder.getTrackingNumber(),
+                    savedOrder.getPickupAddress()
+            );
+        }
+
         return orderMapper.toResponse(savedOrder);
     }
 
@@ -255,6 +275,20 @@ public class OrderService {
         // Publish events
         publishOrderEvent(savedOrder);
 
+        // Send Push Notification
+        String fcmToken = driver.getUser().getFcmToken() != null 
+                          ? driver.getUser().getFcmToken() 
+                          : driver.getUser().getId().toString();
+        notificationService.sendNotification(
+                driver.getUser().getId(),
+                fcmToken,
+                NotificationTemplate.DRIVER_ASSIGNED_NEW_ORDER,
+                NotificationType.PUSH,
+                "/orders/" + savedOrder.getId(),
+                savedOrder.getTrackingNumber(),
+                savedOrder.getPickupAddress()
+        );
+
         return orderMapper.toResponse(savedOrder);
     }
 
@@ -281,6 +315,9 @@ public class OrderService {
         if (request.getStatus() == OrderStatus.DELIVERED) {
             if (request.getOtp() == null || !request.getOtp().equals(order.getDeliveryOtp())) {
                 throw new BadRequestException("Invalid delivery OTP");
+            }
+            if (request.getProofOfDeliveryUrl() != null) {
+                order.setProofOfDeliveryUrl(request.getProofOfDeliveryUrl());
             }
             order.setDeliveredAt(LocalDateTime.now());
 

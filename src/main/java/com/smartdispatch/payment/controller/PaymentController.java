@@ -77,6 +77,16 @@ public class PaymentController {
                 .success(true).message("Ledger entries fetched").status(200).data(entries).build());
     }
 
+    @GetMapping("/my-transactions")
+    public ResponseEntity<ApiResponse<Page<com.smartdispatch.payment.dto.WalletLedgerResponse>>> getMyTransactions(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        Page<com.smartdispatch.payment.dto.WalletLedgerResponse> entries = paymentService.getMyLedgerEntries(page, size);
+        return ResponseEntity.ok(ApiResponse.<Page<com.smartdispatch.payment.dto.WalletLedgerResponse>>builder()
+                .success(true).message("Wallet transactions fetched").status(200).data(entries).build());
+    }
+
     @PostMapping("/wallet/top-up")
     public ResponseEntity<ApiResponse<Double>> topUpWallet(@RequestParam Double amount) {
         Double balance = paymentService.topUpWallet(amount);

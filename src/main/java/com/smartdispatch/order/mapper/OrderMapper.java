@@ -46,8 +46,9 @@ public class OrderMapper {
                 // Cancellation
                 .cancellationReason(order.getCancellationReason())
                 .cancelledBy(order.getCancelledBy())
-                // Notes & Rating
+                // Notes, Proof & Rating
                 .customerNotes(order.getCustomerNotes())
+                .proofOfDeliveryUrl(order.getProofOfDeliveryUrl())
                 .customerRating(order.getCustomerRating())
                 .customerFeedback(order.getCustomerFeedback())
                 // Timestamps

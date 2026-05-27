@@ -64,8 +64,9 @@ public class OrderResponse {
     private String cancellationReason;
     private String cancelledBy;
 
-    // Notes & Rating
+    // Notes, Proof & Rating
     private String customerNotes;
+    private String proofOfDeliveryUrl;
     private Double customerRating;
     private String customerFeedback;
 

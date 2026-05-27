@@ -89,6 +89,9 @@ public class User {
     @Builder.Default
     private Boolean smsEnabled = true;
 
+    // Firebase Cloud Messaging Token
+    private String fcmToken;
+
     // ═══════════════════════════════════════════
     // Referral System
     // ═══════════════════════════════════════════

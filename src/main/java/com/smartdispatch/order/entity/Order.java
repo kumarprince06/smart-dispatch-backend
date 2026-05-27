@@ -138,6 +138,8 @@ public class Order {
     // ═══════════════════════════════════════════
     // Rating (after delivery)
     // ═══════════════════════════════════════════
+    private String proofOfDeliveryUrl;
+
     private Double customerRating;
 
     private String customerFeedback;

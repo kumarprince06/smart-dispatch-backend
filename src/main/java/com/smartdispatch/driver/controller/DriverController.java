@@ -271,6 +271,25 @@ public class DriverController {
     }
 
     // ═══════════════════════════════════════════
+    // Update FCM Token (Driver self-service via JWT)
+    // ═══════════════════════════════════════════
+    @PostMapping("/me/fcm-token")
+    @PreAuthorize("hasRole('DRIVER')")
+    public ResponseEntity<ApiResponse<Void>> updateFcmToken(
+            @RequestBody java.util.Map<String, String> request
+    ) {
+        String token = request.get("fcmToken");
+        driverService.updateFcmToken(token);
+        return ResponseEntity.ok(
+                ApiResponse.<Void>builder()
+                        .success(true)
+                        .message("FCM token updated successfully")
+                        .status(HttpStatus.OK.value())
+                        .build()
+        );
+    }
+
+    // ═══════════════════════════════════════════
     // Driver Stats (Admin Dashboard)
     // ═══════════════════════════════════════════
     @GetMapping("/stats")

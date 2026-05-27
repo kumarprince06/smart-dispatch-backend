@@ -223,6 +223,28 @@ public class PaymentService {
     }
 
     // ═══════════════════════════════════════════
+    // Get My Ledger Entries (Wallet Transactions)
+    // ═══════════════════════════════════════════
+    public Page<com.smartdispatch.payment.dto.WalletLedgerResponse> getMyLedgerEntries(int page, int size) {
+        String email = SecurityUtil.getCurrentUserEmail();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("User not found"));
+
+        return walletLedgerRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), PageRequest.of(page, size))
+                .map(l -> com.smartdispatch.payment.dto.WalletLedgerResponse.builder()
+                        .id(l.getId())
+                        .userId(l.getUserId())
+                        .amount(l.getAmount())
+                        .type(l.getType())
+                        .source(l.getSource())
+                        .referenceId(l.getReferenceId())
+                        .description(l.getDescription())
+                        .balanceAfter(l.getBalanceAfter())
+                        .createdAt(l.getCreatedAt())
+                        .build());
+    }
+
+    // ═══════════════════════════════════════════
     // Wallet Top-Up
     // ═══════════════════════════════════════════
     @Transactional

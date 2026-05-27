@@ -446,6 +446,19 @@ public class DriverService {
     }
 
     // ═══════════════════════════════════════════
+    // Update FCM Token (JWT-based)
+    // ═══════════════════════════════════════════
+    @Transactional
+    public void updateFcmToken(String fcmToken) {
+        String email = SecurityUtil.getCurrentUserEmail();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("User not found"));
+        user.setFcmToken(fcmToken);
+        userRepository.save(user);
+        log.info("FCM token updated for user: {}", email);
+    }
+
+    // ═══════════════════════════════════════════
     // Update Driver Rating (weighted average)
     // ═══════════════════════════════════════════
     @Transactional

@@ -15,4 +15,6 @@ public class UpdateOrderStatusRequest {
     private OrderStatus status;
 
     private String otp; // For pickup/delivery verification
+
+    private String proofOfDeliveryUrl; // Used when status is DELIVERED
 }
