@@ -197,6 +197,32 @@ public class PaymentService {
     }
 
     // ═══════════════════════════════════════════
+    // Get All Payments (Admin)
+    // ═══════════════════════════════════════════
+    public Page<PaymentResponse> getAllPayments(int page, int size) {
+        return paymentRepository.findAll(PageRequest.of(page, size, Sort.by("createdAt").descending()))
+                .map(this::mapToResponse);
+    }
+
+    // ═══════════════════════════════════════════
+    // Get All Ledger Entries (Admin)
+    // ═══════════════════════════════════════════
+    public Page<com.smartdispatch.payment.dto.WalletLedgerResponse> getAllLedgerEntries(int page, int size) {
+        return walletLedgerRepository.findAll(PageRequest.of(page, size, Sort.by("createdAt").descending()))
+                .map(l -> com.smartdispatch.payment.dto.WalletLedgerResponse.builder()
+                        .id(l.getId())
+                        .userId(l.getUserId())
+                        .amount(l.getAmount())
+                        .type(l.getType())
+                        .source(l.getSource())
+                        .referenceId(l.getReferenceId())
+                        .description(l.getDescription())
+                        .balanceAfter(l.getBalanceAfter())
+                        .createdAt(l.getCreatedAt())
+                        .build());
+    }
+
+    // ═══════════════════════════════════════════
     // Wallet Top-Up
     // ═══════════════════════════════════════════
     @Transactional
