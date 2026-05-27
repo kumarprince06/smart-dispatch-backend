@@ -2,6 +2,7 @@ package com.smartdispatch.driver.service;
 
 import com.smartdispatch.auth.entity.User;
 import com.smartdispatch.auth.repository.UserRepository;
+import com.smartdispatch.common.service.EmailService;
 import com.smartdispatch.dispatch.service.GeoLocationService;
 import com.smartdispatch.driver.dto.*;
 import com.smartdispatch.driver.entity.Driver;
@@ -39,6 +40,7 @@ public class DriverService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final DriverMapper driverMapper;
     private final GeoLocationService geoLocationService;
+    private final EmailService emailService;
 
     // ═══════════════════════════════════════════
     // Onboard New Driver
@@ -150,6 +152,13 @@ public class DriverService {
         Driver savedDriver = driverRepository.save(driver);
 
         log.info("Admin successfully onboarded new driver. ID: {}, User: {}", savedDriver.getId(), user.getEmail());
+
+        // Send welcome email with credentials
+        emailService.sendDriverWelcomeEmail(
+            user.getEmail(),
+            user.getFirstName(),
+            request.getVehicleNumber()
+        );
 
         return driverMapper.toResponse(savedDriver);
     }

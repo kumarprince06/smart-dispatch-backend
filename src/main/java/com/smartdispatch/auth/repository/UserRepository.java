@@ -29,4 +29,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("search") String search,
             Pageable pageable
     );
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role.name = 'ROLE_CUSTOMER'")
+    Long countTotalCustomers();
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role.name = 'ROLE_CUSTOMER' AND u.active = true")
+    Long countActiveCustomers();
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role.name = 'ROLE_CUSTOMER' AND u.active = false")
+    Long countSuspendedCustomers();
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role.name = 'ROLE_CUSTOMER' AND u.createdAt >= :since")
+    Long countNewCustomersSince(@Param("since") java.time.LocalDateTime since);
 }

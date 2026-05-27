@@ -52,4 +52,31 @@ public class EmailService {
             log.error("Failed to send verification email to: {}", to, e);
         }
     }
+
+    public void sendDriverWelcomeEmail(String to, String firstName, String vehicleNumber) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(fromEmail);
+        message.setTo(to);
+        message.setSubject("Welcome to Smart Dispatch – Your Driver Account is Ready");
+        message.setText(
+            "Dear " + firstName + ",\n\n" +
+            "Congratulations! You have been successfully onboarded as a driver on the Smart Dispatch platform.\n\n" +
+            "Here are your account details:\n" +
+            "  - Email: " + to + "\n" +
+            "  - Temporary Password: Welcome@123\n" +
+            "  - Registered Vehicle: " + vehicleNumber + "\n\n" +
+            "Please log in using these credentials and change your password immediately.\n" +
+            "Your account is currently pending KYC verification by our admin team.\n\n" +
+            "Download the Smart Dispatch driver app to get started.\n\n" +
+            "Best Regards,\n" +
+            "Smart Dispatch Team"
+        );
+
+        try {
+            mailSender.send(message);
+            log.info("Driver welcome email sent successfully to: {}", to);
+        } catch (Exception e) {
+            log.error("Failed to send driver welcome email to: {}", to, e);
+        }
+    }
 }

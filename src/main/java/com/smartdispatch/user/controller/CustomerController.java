@@ -56,4 +56,11 @@ public class CustomerController {
                 .status(200)
                 .build());
     }
+
+    @GetMapping("/stats")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Long>>> getCustomerStats() {
+        return ResponseEntity.ok(ApiResponse.<java.util.Map<String, Long>>builder()
+                .success(true).message("Customer stats fetched").status(200)
+                .data(customerService.getCustomerStats()).build());
+    }
 }

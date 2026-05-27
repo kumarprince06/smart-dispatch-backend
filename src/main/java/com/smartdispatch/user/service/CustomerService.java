@@ -48,4 +48,14 @@ public class CustomerService {
         
         return customerMapper.toResponse(updated);
     }
+
+    public java.util.Map<String, Long> getCustomerStats() {
+        java.time.LocalDateTime sevenDaysAgo = java.time.LocalDateTime.now().minusDays(7);
+        return java.util.Map.of(
+            "totalCustomers", userRepository.countTotalCustomers(),
+            "activeCustomers", userRepository.countActiveCustomers(),
+            "suspendedCustomers", userRepository.countSuspendedCustomers(),
+            "newThisWeek", userRepository.countNewCustomersSince(sevenDaysAgo)
+        );
+    }
 }
