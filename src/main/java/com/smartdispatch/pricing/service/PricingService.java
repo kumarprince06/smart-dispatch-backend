@@ -1,7 +1,10 @@
 package com.smartdispatch.pricing.service;
 
+import com.smartdispatch.config.entity.PlatformConfig;
+import com.smartdispatch.config.service.PlatformConfigService;
 import com.smartdispatch.order.enums.OrderPriority;
 import com.smartdispatch.order.enums.PackageType;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
@@ -9,16 +12,20 @@ import org.springframework.stereotype.Service;
  * Extracted to follow the Single Responsibility Principle (SOLID).
  */
 @Service
+@RequiredArgsConstructor
 public class PricingService {
 
-    private static final double BASE_FEE = 30.0;
-    private static final double PER_KM_RATE = 12.0;
+    private final PlatformConfigService configService;
 
     /**
      * Calculates the delivery fee based on distance, priority, and package type.
      */
     public double calculateFee(double distanceKm, OrderPriority priority, PackageType packageType) {
-        double fee = BASE_FEE + (PER_KM_RATE * distanceKm);
+        PlatformConfig config = configService.getConfig();
+        double baseFee = config.getBaseFare() != null ? config.getBaseFare() : 30.0;
+        double perKmRate = config.getPerKmRate() != null ? config.getPerKmRate() : 12.0;
+
+        double fee = baseFee + (perKmRate * distanceKm);
 
         // Priority multiplier
         if (priority != null) {
