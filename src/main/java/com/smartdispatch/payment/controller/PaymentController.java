@@ -83,4 +83,20 @@ public class PaymentController {
         return ResponseEntity.ok(ApiResponse.<Double>builder()
                 .success(true).message("Wallet topped up. Balance: ₹" + balance).status(200).data(balance).build());
     }
+
+    @GetMapping("/stats/revenue")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Double>> getTotalRevenue() {
+        Double revenue = paymentService.getTotalRevenue();
+        return ResponseEntity.ok(ApiResponse.<Double>builder()
+                .success(true).message("Revenue fetched").status(200).data(revenue).build());
+    }
+
+    @GetMapping("/stats/chart")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<java.util.List<java.util.Map<String, Object>>>> getRevenueChartData() {
+        java.util.List<java.util.Map<String, Object>> data = paymentService.getRevenueChartData();
+        return ResponseEntity.ok(ApiResponse.<java.util.List<java.util.Map<String, Object>>>builder()
+                .success(true).message("Chart data fetched").status(200).data(data).build());
+    }
 }

@@ -281,4 +281,12 @@ public class PaymentService {
                 .createdAt(p.getCreatedAt())
                 .build();
     }
+
+    public Double getTotalRevenue() {
+        return paymentRepository.calculateTotalRevenue();
+    }
+
+    public java.util.List<java.util.Map<String, Object>> getRevenueChartData() {
+        return paymentRepository.getRevenueChartData();
+    }
 }
