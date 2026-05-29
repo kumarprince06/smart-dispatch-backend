@@ -4,9 +4,9 @@ spring:
 
   datasource:
     # Production Database (Injected by Render Environment Variables)
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/smatchdispatch}
+    username: ${DB_USERNAME:admin}
+    password: ${DB_PASSWORD:123456789}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -16,13 +16,13 @@ spring:
 
   redis:
     # Production Cache
-    host: ${REDIS_HOST}
+    host: ${REDIS_HOST:localhost}
     port: 6379
-    ssl: ${REDIS_SSL:true}
+    ssl: ${REDIS_SSL:false}
     password: ${REDIS_PASSWORD:}
 
   kafka:
-    bootstrap-servers: ${KAFKA_SERVER}
+    bootstrap-servers: ${KAFKA_SERVER:localhost:9092}
     properties:
       sasl:
         mechanism: ${KAFKA_SASL_MECHANISM:PLAIN}
@@ -37,14 +37,14 @@ spring:
     baseline-version: 1
 
   jwt:
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET:dfgrthfsfwet34dsfbfhfhwrt54tfds45ddsgdfg5yt45dgdgdeqrgdfhgjsewrwtreyrtutndfdsfsdfet45t4dgdfg4w5t45yrtgdset455ydfgdfgwrw45}
     expiration: 86400000
 
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
+    username: ${MAIL_USERNAME:sharma.princekumar0611@gmail.com}
+    password: ${MAIL_PASSWORD:yevfjswycnzhenbh}
     properties:
       mail:
         smtp:
