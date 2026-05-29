@@ -1,0 +1,124 @@
+package com.smartdispatch.payment.controller;
+
+import com.smartdispatch.payment.entity.Payment;
+import com.smartdispatch.payment.enums.PaymentStatus;
+import com.smartdispatch.payment.repository.PaymentRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+import java.util.Map;
+
+/**
+ * Payment Webhook Controller.
+ * Receives async callbacks from payment gateways.
+ *
+ * CRITICAL: Never trust client-side payment confirmation.
+ * Always verify via gateway webhook.
+ */
+@RestController
+@RequestMapping("/api/v1/payments/webhook")
+@RequiredArgsConstructor
+@Slf4j
+public class WebhookController {
+
+    private final PaymentRepository paymentRepository;
+
+    // ═══════════════════════════════════════════
+    // Razorpay Webhook
+    // ═══════════════════════════════════════════
+    @PostMapping("/razorpay")
+    public ResponseEntity<Void> razorpayWebhook(
+            @RequestBody Map<String, Object> payload,
+            @RequestHeader(value = "X-Razorpay-Signature", required = false) String signature
+    ) {
+        log.info("[WEBHOOK] Razorpay event received");
+
+        // TODO: Verify signature using Razorpay Utils
+        // boolean isValid = Utils.verifyWebhookSignature(payload, signature, webhookSecret);
+
+        String event = (String) payload.get("event");
+        if ("payment.captured".equals(event)) {
+            processPaymentSuccess(payload, "RAZORPAY");
+        } else if ("payment.failed".equals(event)) {
+            processPaymentFailure(payload, "RAZORPAY");
+        }
+
+        return ResponseEntity.ok().build();
+    }
+
+    // ═══════════════════════════════════════════
+    // Stripe Webhook
+    // ═══════════════════════════════════════════
+    @PostMapping("/stripe")
+    public ResponseEntity<Void> stripeWebhook(
+            @RequestBody Map<String, Object> payload,
+            @RequestHeader(value = "Stripe-Signature", required = false) String signature
+    ) {
+        log.info("[WEBHOOK] Stripe event received");
+
+        // TODO: Verify signature using Stripe SDK
+        // Event event = Webhook.constructEvent(payload, signature, endpointSecret);
+
+        String type = (String) payload.get("type");
+        if ("payment_intent.succeeded".equals(type)) {
+            processPaymentSuccess(payload, "STRIPE");
+        } else if ("payment_intent.payment_failed".equals(type)) {
+            processPaymentFailure(payload, "STRIPE");
+        }
+
+        return ResponseEntity.ok().build();
+    }
+
+    // ═══════════════════════════════════════════
+    // PayPal Webhook
+    // ═══════════════════════════════════════════
+    @PostMapping("/paypal")
+    public ResponseEntity<Void> paypalWebhook(@RequestBody Map<String, Object> payload) {
+        log.info("[WEBHOOK] PayPal event received");
+        // TODO: Verify PayPal webhook signature
+        return ResponseEntity.ok().build();
+    }
+
+    // ═══════════════════════════════════════════
+    // Common Processing Logic
+    // ═══════════════════════════════════════════
+    private void processPaymentSuccess(Map<String, Object> payload, String provider) {
+        String gatewayPaymentId = extractPaymentId(payload);
+        paymentRepository.findByGatewayPaymentId(gatewayPaymentId).ifPresent(payment -> {
+            payment.setStatus(PaymentStatus.SUCCESS);
+            payment.setPaidAt(LocalDateTime.now());
+            paymentRepository.save(payment);
+            log.info("[WEBHOOK] Payment SUCCESS. Provider: {}, TxnID: {}", provider, payment.getTransactionId());
+        });
+    }
+
+    private void processPaymentFailure(Map<String, Object> payload, String provider) {
+        String gatewayPaymentId = extractPaymentId(payload);
+        paymentRepository.findByGatewayPaymentId(gatewayPaymentId).ifPresent(payment -> {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setFailureReason("Gateway reported failure");
+            paymentRepository.save(payment);
+            log.warn("[WEBHOOK] Payment FAILED. Provider: {}, TxnID: {}", provider, payment.getTransactionId());
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private String extractPaymentId(Map<String, Object> payload) {
+        try {
+            Map<String, Object> payloadData = (Map<String, Object>) payload.get("payload");
+            if (payloadData != null) {
+                Map<String, Object> paymentEntity = (Map<String, Object>) payloadData.get("payment");
+                if (paymentEntity != null) {
+                    Map<String, Object> entity = (Map<String, Object>) paymentEntity.get("entity");
+                    if (entity != null) return (String) entity.get("id");
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to extract payment ID from webhook payload", e);
+        }
+        return "";
+    }
+}

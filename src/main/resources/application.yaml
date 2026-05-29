@@ -3,9 +3,11 @@ spring:
     name: smart-dispatch-backend
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/smatchdispatch
-    username: admin
-    password: 123456789
+    # Production Database (Injected by Render Environment Variables)
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
@@ -13,8 +15,80 @@ spring:
     show-sql: true
 
   redis:
-    hostname: localhost
+    # Production Cache
+    host: ${REDIS_HOST}
     port: 6379
+    ssl: true
+    password: ${REDIS_PASSWORD}
 
   kafka:
-    bootstrap-servers: localhost:9002
+    bootstrap-servers: ${KAFKA_SERVER}
+    properties:
+      sasl:
+        mechanism: PLAIN
+        jaas:
+          config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_USERNAME}" password="${KAFKA_PASSWORD}";
+      security:
+        protocol: SASL_SSL
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration: 86400000
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - [%X{correlationId}] - %msg%n"
+
+payment:
+  stripe:
+    public-key: pk_test_51MockStripeKey123
+    secret-key: sk_test_51MockStripeSecret456
+    webhook-secret: whsec_MockStripeWebhook789
+  razorpay:
+    key-id: rzp_test_MockRazorpayKey
+    key-secret: MockRazorpaySecretKey999
+    webhook-secret: mock_razorpay_webhook_secret
+  paypal:
+    client-id: mock_paypal_client_id_test
+    client-secret: mock_paypal_client_secret_test
+  cashfree:
+    app-id: mock_cashfree_app_id_test
+    secret-key: mock_cashfree_secret_key_test
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 5
+        minimumNumberOfCalls: 3
+        permittedNumberOfCallsInHalfOpenState: 2
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+    instances:
+      stripe:
+        baseConfig: default
+      razorpay:
+        baseConfig: default
+      paypal:
+        baseConfig: default
+      cashfree:
+        baseConfig: default
