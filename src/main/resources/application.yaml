@@ -3,56 +3,33 @@ spring:
     name: smart-dispatch-backend
 
   datasource:
-    #Local Database
-    #    url: jdbc:postgresql://localhost:5432/smatchdispatch
-    #    username: admin
-    #    password: 123456789
-
-    # Production Database
-    url: postgresql://neondb_owner:npg_r7LqnlgH2Asp@ep-snowy-art-ao68mjwl.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
-    username: neondb_owner
-    password: npg_r7LqnlgH2Asp
+    # Production Database (Injected by Render Environment Variables)
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
       ddl-auto: update
-
     show-sql: true
 
   redis:
-    # Localhost
-    # host: localhost
-    # port: 6379
-
-    # Production
-    host: rested-swan-77395.upstash.io
+    # Production Cache
+    host: ${REDIS_HOST}
     port: 6379
     ssl: true
-    password: gQAAAAAAAS5TAAIgcDFhMTlhMzRmODliMDU0NDg4ODc1MThmNjVhMmNmZGUwOA
+    password: ${REDIS_PASSWORD}
 
   kafka:
-    bootstrap-servers: pkc-312o0.ap-southeast-1.aws.confluent.cloud:9092
+    bootstrap-servers: ${KAFKA_SERVER}
     properties:
       sasl:
         mechanism: PLAIN
         jaas:
-          config: org.apache.kafka.common.security.plain.PlainLoginModule required username="YXOGLDCUEX4ZKACW" password="cfltTodDooCzHnOFFrcuN/FUFt1NMSG3ZpgIufsElHGPJ0NAi1B1fZnfTh5Z3n1g";
+          config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_USERNAME}" password="${KAFKA_PASSWORD}";
       security:
         protocol: SASL_SSL
-
-
-    # Localhost
-#    bootstrap-servers: localhost:9092
-#    producer:
-#      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-#      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-#    consumer:
-#      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-#      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-#      properties:
-#        spring.json.trusted.packages: "*"
-
 
   flyway:
     enabled: true
@@ -60,14 +37,14 @@ spring:
     baseline-version: 1
 
   jwt:
-    secret: dfgrthfsfwet34dsfbfhfhwrt54tfds45ddsgdfg5yt45dgdgdeqrgdfhgjsewrwtreyrtutndfdsfsdfet45t4dgdfg4w5t45yrtgdset455ydfgdfgwrw45
+    secret: ${JWT_SECRET}
     expiration: 86400000
 
   mail:
     host: smtp.gmail.com
     port: 587
-    username: sharma.princekumar0611@gmail.com
-    password: yevfjswycnzhenbh
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
     properties:
       mail:
         smtp:
