@@ -13,11 +13,18 @@ public class FirebaseConfig {
     @PostConstruct
     public void init() {
         try {
-            InputStream serviceAccount = getClass().getResourceAsStream("/firebase-service-account.json");
+            InputStream serviceAccount = null;
+            java.io.File secretFile = new java.io.File("/etc/secrets/firebase.json");
+            if (secretFile.exists()) {
+                serviceAccount = new java.io.FileInputStream(secretFile);
+                System.out.println("✅ Found Firebase credentials in Render Secret Files.");
+            } else {
+                serviceAccount = getClass().getResourceAsStream("/firebase-service-account.json");
+            }
             
             // If the file is not there, we don't want to crash the whole app in dev
             if (serviceAccount == null) {
-                System.out.println("⚠️ firebase-service-account.json not found in resources. Firebase Push is disabled.");
+                System.out.println("⚠️ firebase-service-account.json not found. Firebase Push is disabled.");
                 return;
             }
 
