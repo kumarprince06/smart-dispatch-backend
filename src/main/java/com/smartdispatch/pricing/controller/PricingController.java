@@ -34,6 +34,29 @@ public class PricingController {
         // 2. Calculate Base Fee
         double baseFee = pricingService.calculateFee(distanceKm, request.getPriority(), request.getPackageType());
 
+        // Calculate Volumetric Weight Surcharge for multiple items
+        double totalChargeableWeight = 0.0;
+        
+        if (request.getItems() != null && !request.getItems().isEmpty()) {
+            for (PriceEstimateRequest.PackageItem item : request.getItems()) {
+                int qty = item.getQuantity() != null && item.getQuantity() > 0 ? item.getQuantity() : 1;
+                double weight = item.getWeightKg() != null ? item.getWeightKg() : 1.0;
+                double l = item.getLengthCm() != null ? item.getLengthCm() : 0.0;
+                double w = item.getWidthCm() != null ? item.getWidthCm() : 0.0;
+                double h = item.getHeightCm() != null ? item.getHeightCm() : 0.0;
+
+                double volWeight = (l * w * h) / 5000.0;
+                totalChargeableWeight += Math.max(weight, volWeight) * qty;
+            }
+        } else {
+            totalChargeableWeight = 1.0;
+        }
+
+        // Add ₹10 for every extra kg over 1kg
+        if (totalChargeableWeight > 1.0) {
+            baseFee += Math.ceil(totalChargeableWeight - 1.0) * 10.0;
+        }
+
         // 3. Apply Surge Multiplier
         double surgeMultiplier = surgePricingService.getSurgeMultiplier();
         double finalFee = Math.round((baseFee * surgeMultiplier) * 100.0) / 100.0;
