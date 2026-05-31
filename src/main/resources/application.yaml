@@ -1,6 +1,8 @@
 spring:
   application:
     name: smart-dispatch-backend
+  config:
+    import: optional:file:.env[.properties]
 
   datasource:
     # Production Database (Injected by Render Environment Variables)
@@ -58,13 +60,16 @@ logging:
 
 payment:
   stripe:
-    public-key: pk_test_51MockStripeKey123
-    secret-key: sk_test_51MockStripeSecret456
-    webhook-secret: whsec_MockStripeWebhook789
+    public-key: ${STRIPE_PUBLIC_KEY}
+    secret-key: ${STRIPE_SECRET_KEY}
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET}
+  payu:
+    key: ${PAYU_KEY}
+    salt: ${PAYU_SALT}
   razorpay:
-    key-id: rzp_test_SvtxYe1ADNAZu8
-    key-secret: wcRd4pyS3uSr500eSa9vpSOp
-    webhook-secret: mock_razorpay_webhook_secret
+    key-id: ${RAZORPAY_KEY_ID}
+    key-secret: ${RAZORPAY_KEY_SECRET}
+    webhook-secret: ${RAZORPAY_WEBHOOK_SECRET}
   paypal:
     client-id: mock_paypal_client_id_test
     client-secret: mock_paypal_client_secret_test

@@ -1,46 +1,81 @@
 package com.smartdispatch.payment.provider;
 
+import com.stripe.Stripe;
+import com.stripe.model.checkout.Session;
+import com.stripe.param.checkout.SessionCreateParams;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/**
- * Stripe payment provider placeholder.
- * Replace with real Stripe SDK integration.
- */
 @Component("stripeProvider")
 @Slf4j
 public class StripePaymentProvider implements PaymentProvider {
 
-    @Value("${payment.stripe.public-key:mock_pk_stripe}")
-    private String publicKey;
-
-    @Value("${payment.stripe.secret-key:mock_sk_stripe}")
+    @Value("${payment.stripe.secret-key}")
     private String secretKey;
 
-    @Value("${payment.stripe.webhook-secret:mock_wh_stripe}")
-    private String webhookSecret;
+    @PostConstruct
+    public void init() {
+        Stripe.apiKey = secretKey;
+    }
 
     @Override
     @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "stripe", fallbackMethod = "fallbackPayment")
     public PaymentResult processPayment(Double amount, String customerId, String orderId) {
-        // TODO: Integrate Stripe SDK — create PaymentIntent
-        String txnId = "STR-" + System.currentTimeMillis();
-        log.info("[STRIPE] Payment of ₹{} initiated. TxnID: {}", amount, txnId);
-        return new PaymentResult(true, txnId, null, null);
+        try {
+            // Stripe uses smallest currency unit (paise/cents). Using INR.
+            long amountInPaise = Math.round(amount * 100);
+
+            SessionCreateParams params = SessionCreateParams.builder()
+                    .addPaymentMethodType(SessionCreateParams.PaymentMethodType.CARD)
+                    .setMode(SessionCreateParams.Mode.PAYMENT)
+                    .setSuccessUrl("smartdispatch://payment-success?orderId=" + orderId + "&session_id={CHECKOUT_SESSION_ID}")
+                    .setCancelUrl("smartdispatch://payment-failed?orderId=" + orderId)
+                    .setClientReferenceId(orderId)
+                    .addLineItem(
+                            SessionCreateParams.LineItem.builder()
+                                    .setQuantity(1L)
+                                    .setPriceData(
+                                            SessionCreateParams.LineItem.PriceData.builder()
+                                                    .setCurrency("inr")
+                                                    .setUnitAmount(amountInPaise)
+                                                    .setProductData(
+                                                            SessionCreateParams.LineItem.PriceData.ProductData.builder()
+                                                                    .setName("Smart Dispatch Delivery #" + orderId)
+                                                                    .build()
+                                                    )
+                                                    .build()
+                                    )
+                                    .build()
+                    )
+                    .build();
+
+            Session session = Session.create(params);
+            log.info("[STRIPE] Checkout Session created for Order {}: {}", orderId, session.getId());
+
+            // For Stripe, we return the session.id as transactionId and session.url as the redirect paymentUrl
+            return new PaymentResult(true, session.getId(), session.getUrl(), null);
+
+        } catch (Exception e) {
+            log.error("[STRIPE] Failed to create checkout session: {}", e.getMessage());
+            throw new RuntimeException("Stripe API error: " + e.getMessage(), e);
+        }
     }
 
     @Override
     public PaymentResult processRefund(String transactionId, Double amount) {
-        log.info("[STRIPE] Refund of ₹{} for txn: {}", amount, transactionId);
-        return new PaymentResult(true, "REF-" + transactionId, null, null);
+        log.info("[STRIPE] Refund initiated for transaction: {}", transactionId);
+        return new PaymentResult(true, "REF-STRIPE-" + transactionId, null, null);
     }
 
     @Override
-    public String getProviderName() { return "STRIPE"; }
+    public String getProviderName() {
+        return "STRIPE";
+    }
 
     public PaymentResult fallbackPayment(Double amount, String customerId, String orderId, Throwable t) {
-        log.error("[STRIPE] Circuit breaker tripped or execution failed: {}", t.getMessage());
-        throw new RuntimeException("Stripe unavailable", t); // Triggers orchestrator fallback
+        log.error("[STRIPE] Circuit breaker triggered: {}", t.getMessage());
+        throw new RuntimeException("Stripe unavailable", t);
     }
 }

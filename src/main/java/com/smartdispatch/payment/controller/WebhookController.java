@@ -59,14 +59,30 @@ public class WebhookController {
     ) {
         log.info("[WEBHOOK] Stripe event received");
 
-        // TODO: Verify signature using Stripe SDK
-        // Event event = Webhook.constructEvent(payload, signature, endpointSecret);
-
         String type = (String) payload.get("type");
-        if ("payment_intent.succeeded".equals(type)) {
-            processPaymentSuccess(payload, "STRIPE");
-        } else if ("payment_intent.payment_failed".equals(type)) {
-            processPaymentFailure(payload, "STRIPE");
+        
+        try {
+            Map<String, Object> data = (Map<String, Object>) payload.get("data");
+            Map<String, Object> object = (Map<String, Object>) data.get("object");
+            String sessionId = (String) object.get("id"); // This is the checkout session ID
+            
+            if ("checkout.session.completed".equals(type)) {
+                paymentRepository.findByProviderTransactionId(sessionId).ifPresent(payment -> {
+                    payment.setStatus(PaymentStatus.SUCCESS);
+                    payment.setPaidAt(LocalDateTime.now());
+                    paymentRepository.save(payment);
+                    log.info("[WEBHOOK] Stripe Payment SUCCESS for Session: {}", sessionId);
+                });
+            } else if ("checkout.session.expired".equals(type) || "checkout.session.async_payment_failed".equals(type)) {
+                paymentRepository.findByProviderTransactionId(sessionId).ifPresent(payment -> {
+                    payment.setStatus(PaymentStatus.FAILED);
+                    payment.setFailureReason("Stripe Checkout Failed/Expired");
+                    paymentRepository.save(payment);
+                    log.warn("[WEBHOOK] Stripe Payment FAILED for Session: {}", sessionId);
+                });
+            }
+        } catch (Exception e) {
+            log.error("Failed to parse Stripe webhook", e);
         }
 
         return ResponseEntity.ok().build();

@@ -44,6 +44,8 @@ public class PaymentService {
     private final PaymentOrchestrator orchestrator;
     private final WalletLedgerRepository walletLedgerRepository;
     private final RazorpayPaymentProvider razorpayProvider;
+    private final com.smartdispatch.payment.provider.StripePaymentProvider stripeProvider;
+    private final com.smartdispatch.payment.provider.PayUPaymentProvider payuProvider;
 
     @Value("${payment.razorpay.key-id}")
     private String razorpayKeyId;
@@ -54,7 +56,9 @@ public class PaymentService {
     public List<Map<String, String>> getAvailableProviders() {
         return List.of(
             Map.of("provider", "WALLET",   "displayName", "Fatafat Wallet"),
-            Map.of("provider", "RAZORPAY", "displayName", "Cards / UPI / NetBanking"),
+            Map.of("provider", "RAZORPAY", "displayName", "Razorpay (Cards / UPI / NetBanking)"),
+            Map.of("provider", "PAYU", "displayName", "PayU (Cards / UPI)"),
+            Map.of("provider", "STRIPE", "displayName", "Stripe (International Cards)"),
             Map.of("provider", "CASH_ON_DELIVERY", "displayName", "Cash on Delivery")
         );
     }
@@ -111,29 +115,49 @@ public class PaymentService {
                     .currency("INR").provider("CASH_ON_DELIVERY").build();
         }
 
-        // For Razorpay: create Razorpay Order
-        PaymentProvider.PaymentResult result = razorpayProvider.processPayment(
-                order.getDeliveryFee(), customer.getId().toString(), order.getId().toString()
-        );
+        PaymentProvider.PaymentResult result;
+        String publicKey = null;
+        
+        if (request.getProvider() == PaymentMethod.STRIPE) {
+            result = stripeProvider.processPayment(
+                    order.getDeliveryFee(), customer.getId().toString(), order.getId().toString()
+            );
+            publicKey = result.paymentUrl();
+        } else if (request.getProvider() == PaymentMethod.PAYU) {
+            result = payuProvider.processPayment(
+                    order.getDeliveryFee(), customer.getId().toString(), order.getId().toString()
+            );
+            publicKey = result.paymentUrl(); // Same as Stripe, PayU URL is in paymentUrl
+        } else {
+            // Default to Razorpay
+            result = razorpayProvider.processPayment(
+                    order.getDeliveryFee(), customer.getId().toString(), order.getId().toString()
+            );
+            publicKey = razorpayKeyId;
+        }
 
-        payment.setProviderTransactionId(result.transactionId()); // = Razorpay order_id
+        payment.setProviderTransactionId(result.transactionId()); 
+        if (result.paymentUrl() != null) {
+            payment.setPaymentUrl(result.paymentUrl());
+        }
         payment.setStatus(PaymentStatus.PROCESSING);
         order.setStatus(OrderStatus.PAYMENT_PENDING);
         orderRepository.save(order);
         Payment saved = paymentRepository.save(payment);
 
-        log.info("[PAYMENT SESSION] Created. TxnID: {}, RazorpayOrderId: {}",
+        log.info("[PAYMENT SESSION] Created. TxnID: {}, GatewayOrderId: {}",
                 saved.getTransactionId(), result.transactionId());
 
         return PaymentSessionResponse.builder()
                 .paymentId(saved.getId())
                 .transactionId(saved.getTransactionId())
-                .paymentSessionId(result.transactionId())  // Razorpay order_id for frontend
-                .key(razorpayKeyId)                         // Public key — safe to send
+                .paymentSessionId(result.transactionId()) 
+                .key(publicKey)                         
                 .orderId(order.getId())
                 .amount(order.getDeliveryFee())
                 .currency("INR")
                 .provider(request.getProvider().name())
+                .paymentUrl(result.paymentUrl())
                 .build();
     }
 

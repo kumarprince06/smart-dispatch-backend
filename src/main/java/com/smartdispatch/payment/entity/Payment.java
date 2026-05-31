@@ -48,7 +48,7 @@ public class Payment {
 
     private String providerTransactionId;
 
-    @Column(name = "payment_url")
+    @Column(name = "payment_url", columnDefinition = "TEXT")
     private String paymentUrl;
 
     private String failureReason;

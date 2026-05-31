@@ -6,6 +6,7 @@ public enum PaymentMethod {
     STRIPE,
     PAYPAL,
     CASHFREE,
+    PAYU,
     UPI,
     CARD,
     NET_BANKING,

@@ -17,4 +17,5 @@ public class PaymentSessionResponse {
     private Double amount;
     private String currency;
     private String provider;
+    private String paymentUrl; // Used for Stripe Checkout redirection
 }
