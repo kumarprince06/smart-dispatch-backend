@@ -89,6 +89,9 @@ public class User {
     @Builder.Default
     private Boolean smsEnabled = true;
 
+    @Builder.Default
+    private Boolean darkMode = false;
+
     // Firebase Cloud Messaging Token
     private String fcmToken;
 

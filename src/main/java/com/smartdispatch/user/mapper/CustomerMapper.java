@@ -31,6 +31,10 @@ public class CustomerMapper {
                 .active(user.getActive())
                 .emailVerified(user.getEmailVerified())
                 .phoneVerified(user.getPhoneVerified())
+                .notificationsEnabled(user.getNotificationsEnabled())
+                .smsEnabled(user.getSmsEnabled())
+                .darkMode(user.getDarkMode())
+                .preferredLanguage(user.getPreferredLanguage())
                 .createdAt(user.getCreatedAt())
                 .lastLoginAt(user.getLastLoginAt())
                 .build();

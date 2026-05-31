@@ -34,6 +34,11 @@ public class CustomerResponse {
     private Boolean emailVerified;
     private Boolean phoneVerified;
 
+    private Boolean notificationsEnabled;
+    private Boolean smsEnabled;
+    private Boolean darkMode;
+    private String preferredLanguage;
+
     private LocalDateTime createdAt;
     private LocalDateTime lastLoginAt;
 }

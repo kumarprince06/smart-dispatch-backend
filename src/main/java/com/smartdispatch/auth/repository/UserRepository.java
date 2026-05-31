@@ -13,32 +13,32 @@ import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    @EntityGraph(attributePaths = {"role"})
+    @EntityGraph(attributePaths = { "role" })
     Optional<User> findByEmail(String email);
 
     Boolean existsByEmail(String email);
 
-    @Query("SELECT u FROM User u WHERE u.role.name = 'ROLE_CUSTOMER' " +
-           "AND (:status IS NULL OR (:status = 'ACTIVE' AND u.active = true) OR (:status = 'INACTIVE' AND u.active = false)) " +
-           "AND (:search IS NULL OR LOWER(u.firstName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) " +
-           "OR LOWER(u.lastName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) " +
-           "OR LOWER(u.email) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) " +
-           "OR LOWER(u.phoneNo) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))")
+    @Query("SELECT u FROM User u WHERE u.role.name = 'CUSTOMER' " +
+            "AND (:status IS NULL OR (:status = 'ACTIVE' AND u.active = true) OR (:status = 'INACTIVE' AND u.active = false)) "
+            +
+            "AND (:search IS NULL OR LOWER(u.firstName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) " +
+            "OR LOWER(u.lastName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) " +
+            "OR LOWER(u.email) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) " +
+            "OR LOWER(u.phoneNo) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))")
     Page<User> findAllCustomers(
             @Param("status") String status,
             @Param("search") String search,
-            Pageable pageable
-    );
+            Pageable pageable);
 
-    @Query("SELECT COUNT(u) FROM User u WHERE u.role.name = 'ROLE_CUSTOMER'")
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role.name = 'CUSTOMER'")
     Long countTotalCustomers();
 
-    @Query("SELECT COUNT(u) FROM User u WHERE u.role.name = 'ROLE_CUSTOMER' AND u.active = true")
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role.name = 'CUSTOMER' AND u.active = true")
     Long countActiveCustomers();
 
-    @Query("SELECT COUNT(u) FROM User u WHERE u.role.name = 'ROLE_CUSTOMER' AND u.active = false")
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role.name = 'CUSTOMER' AND u.active = false")
     Long countSuspendedCustomers();
 
-    @Query("SELECT COUNT(u) FROM User u WHERE u.role.name = 'ROLE_CUSTOMER' AND u.createdAt >= :since")
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role.name = 'CUSTOMER' AND u.createdAt >= :since")
     Long countNewCustomersSince(@Param("since") java.time.LocalDateTime since);
 }
