@@ -80,7 +80,7 @@ public class PaymentOrchestrator {
             }
         }
 
-        return new PaymentProvider.PaymentResult(false, null, "All payment providers failed");
+        return new PaymentProvider.PaymentResult(false, null, null, "All payment providers failed");
     }
 
     // ═══════════════════════════════════════════

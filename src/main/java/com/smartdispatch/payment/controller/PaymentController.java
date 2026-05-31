@@ -1,8 +1,7 @@
 package com.smartdispatch.payment.controller;
 
 import com.smartdispatch.common.dto.ApiResponse;
-import com.smartdispatch.payment.dto.PaymentRequest;
-import com.smartdispatch.payment.dto.PaymentResponse;
+import com.smartdispatch.payment.dto.*;
 import com.smartdispatch.payment.service.PaymentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,12 +11,54 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor
 public class PaymentController {
 
     private final PaymentService paymentService;
+
+    // ─────────────────────────────────────────────────────────────────
+    // Step 0: Get Available Payment Providers
+    // ─────────────────────────────────────────────────────────────────
+    @GetMapping("/providers")
+    public ResponseEntity<ApiResponse<List<Map<String, String>>>> getProviders() {
+        return ResponseEntity.ok(ApiResponse.<List<Map<String, String>>>builder()
+                .success(true).message("Providers fetched").status(200)
+                .data(paymentService.getAvailableProviders()).build());
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Step 1: Create Payment Session (returns Razorpay order_id + key)
+    // ─────────────────────────────────────────────────────────────────
+    @PostMapping("/create-session")
+    public ResponseEntity<ApiResponse<PaymentSessionResponse>> createPaymentSession(
+            @Valid @RequestBody PaymentSessionRequest request
+    ) {
+        PaymentSessionResponse session = paymentService.createPaymentSession(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                ApiResponse.<PaymentSessionResponse>builder()
+                        .success(true).message("Payment session created").status(201)
+                        .data(session).build()
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Step 2: Verify Payment (after frontend Razorpay Checkout)
+    // ─────────────────────────────────────────────────────────────────
+    @PostMapping("/verify")
+    public ResponseEntity<ApiResponse<PaymentResponse>> verifyPayment(
+            @Valid @RequestBody PaymentVerifyRequest request
+    ) {
+        PaymentResponse response = paymentService.verifyPayment(request);
+        return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
+                .success(true).message("Payment verified successfully").status(200)
+                .data(response).build());
+    }
+
 
     @PostMapping
     public ResponseEntity<ApiResponse<PaymentResponse>> processPayment(

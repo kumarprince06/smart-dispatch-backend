@@ -30,7 +30,7 @@ public class SurgePricingService {
      */
     public double getSurgeMultiplier() {
         // Demand: orders waiting for assignment
-        long demand = orderRepository.countByStatus(OrderStatus.CREATED);
+        long demand = orderRepository.countByStatus(OrderStatus.REQUESTED);
 
         // Supply: available drivers
         long supply = driverRepository.countByStatus(DriverStatus.AVAILABLE);
@@ -77,7 +77,7 @@ public class SurgePricingService {
      * Get surge details (for UI display).
      */
     public SurgeInfo getSurgeInfo() {
-        long demand = orderRepository.countByStatus(OrderStatus.CREATED);
+        long demand = orderRepository.countByStatus(OrderStatus.REQUESTED);
         long supply = driverRepository.countByStatus(DriverStatus.AVAILABLE);
         double multiplier = getSurgeMultiplier();
 

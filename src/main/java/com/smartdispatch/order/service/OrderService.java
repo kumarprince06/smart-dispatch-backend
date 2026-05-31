@@ -61,7 +61,7 @@ public class OrderService {
 
     // Valid state transitions (State Machine)
     private static final Map<OrderStatus, Set<OrderStatus>> VALID_TRANSITIONS = Map.of(
-            OrderStatus.CREATED, Set.of(OrderStatus.ASSIGNED, OrderStatus.CANCELLED),
+            OrderStatus.REQUESTED, Set.of(OrderStatus.ASSIGNED, OrderStatus.CANCELLED),
             OrderStatus.ASSIGNED, Set.of(OrderStatus.PICKED_UP, OrderStatus.CANCELLED),
             OrderStatus.PICKED_UP, Set.of(OrderStatus.IN_TRANSIT, OrderStatus.CANCELLED),
             OrderStatus.IN_TRANSIT, Set.of(OrderStatus.DELIVERED, OrderStatus.FAILED),
@@ -129,7 +129,7 @@ public class OrderService {
                 .pickupOtp(pickupOtp)
                 .deliveryOtp(deliveryOtp)
                 .customerNotes(request.getCustomerNotes())
-                .status(OrderStatus.CREATED)
+                .status(OrderStatus.REQUESTED)
                 .isScheduled(request.getScheduledAt() != null && !request.getScheduledAt().trim().isEmpty())
                 .scheduledAt(request.getScheduledAt() != null && !request.getScheduledAt().trim().isEmpty() 
                         ? LocalDateTime.parse(request.getScheduledAt()) : null)
@@ -267,8 +267,8 @@ public class OrderService {
     public OrderResponse manuallyAssignDriver(Long orderId, AssignDriverRequest request) {
         Order order = findOrderOrThrow(orderId);
 
-        if (order.getStatus() != OrderStatus.CREATED) {
-            throw new BadRequestException("Only CREATED orders can be manually assigned. Current status: " + order.getStatus());
+        if (order.getStatus() != OrderStatus.REQUESTED) {
+            throw new BadRequestException("Only REQUESTED orders can be manually assigned. Current status: " + order.getStatus());
         }
 
         Driver driver = driverRepository.findById(request.getDriverId())
@@ -430,7 +430,7 @@ public class OrderService {
         log.info("Loading order stats from database");
         return OrderStatsResponse.builder()
                 .totalOrders(orderRepository.count())
-                .createdOrders(orderRepository.countByStatus(OrderStatus.CREATED))
+                .createdOrders(orderRepository.countByStatus(OrderStatus.REQUESTED))
                 .assignedOrders(orderRepository.countByStatus(OrderStatus.ASSIGNED))
                 .pickedUpOrders(orderRepository.countByStatus(OrderStatus.PICKED_UP))
                 .inTransitOrders(orderRepository.countByStatus(OrderStatus.IN_TRANSIT))
@@ -480,7 +480,10 @@ public class OrderService {
     // Publish order status change to Kafka Event Bus
     private void publishOrderEvent(Order order) {
         String humanMessage = switch (order.getStatus()) {
-            case CREATED -> "Your order has been placed!";
+            case REQUESTED -> "Your order has been placed!";
+            case PAYMENT_PENDING -> "Awaiting payment for your order.";
+            case PAYMENT_FAILED -> "Payment failed for your order.";
+            case CONFIRMED -> "Your order is confirmed!";
             case ASSIGNED -> "A driver has been assigned to your order";
             case PICKED_UP -> "Your package has been picked up!";
             case IN_TRANSIT -> "Your package is on the way!";

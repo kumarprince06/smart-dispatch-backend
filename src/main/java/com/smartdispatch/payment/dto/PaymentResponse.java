@@ -20,6 +20,7 @@ public class PaymentResponse {
     private PaymentMethod method;
     private PaymentStatus status;
     private String providerTransactionId;
+    private String paymentUrl;
     private String failureReason;
     private LocalDateTime paidAt;
     private LocalDateTime createdAt;

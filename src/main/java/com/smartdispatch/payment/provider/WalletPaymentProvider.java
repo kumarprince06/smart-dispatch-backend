@@ -24,7 +24,7 @@ public class WalletPaymentProvider implements PaymentProvider {
                 .orElseThrow(() -> new BadRequestException("User not found"));
 
         if (user.getWalletBalance() < amount) {
-            return new PaymentResult(false, null, "Insufficient wallet balance");
+            return new PaymentResult(false, null, null, "Insufficient wallet balance");
         }
 
         user.setWalletBalance(user.getWalletBalance() - amount);
@@ -33,13 +33,13 @@ public class WalletPaymentProvider implements PaymentProvider {
         String txnId = "WLT-" + System.currentTimeMillis();
         log.info("[WALLET] Payment of ₹{} processed. TxnID: {}", amount, txnId);
 
-        return new PaymentResult(true, txnId, null);
+        return new PaymentResult(true, txnId, null, null);
     }
 
     @Override
     public PaymentResult processRefund(String transactionId, Double amount) {
         log.info("[WALLET] Refund of ₹{} processed for txn: {}", amount, transactionId);
-        return new PaymentResult(true, "REF-" + transactionId, null);
+        return new PaymentResult(true, "REF-" + transactionId, null, null);
     }
 
     @Override

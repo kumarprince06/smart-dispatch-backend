@@ -7,20 +7,22 @@ import com.smartdispatch.notification.enums.NotificationTemplate;
 import com.smartdispatch.notification.enums.NotificationType;
 import com.smartdispatch.notification.service.NotificationService;
 import com.smartdispatch.order.entity.Order;
+import com.smartdispatch.order.enums.OrderStatus;
 import com.smartdispatch.order.repository.OrderRepository;
-import com.smartdispatch.payment.dto.PaymentRequest;
-import com.smartdispatch.payment.dto.PaymentResponse;
+import com.smartdispatch.payment.dto.*;
 import com.smartdispatch.payment.entity.Payment;
 import com.smartdispatch.payment.entity.WalletLedger;
 import com.smartdispatch.payment.enums.PaymentMethod;
 import com.smartdispatch.payment.enums.PaymentStatus;
 import com.smartdispatch.payment.orchestrator.PaymentOrchestrator;
 import com.smartdispatch.payment.provider.PaymentProvider;
+import com.smartdispatch.payment.provider.RazorpayPaymentProvider;
 import com.smartdispatch.payment.repository.PaymentRepository;
 import com.smartdispatch.payment.repository.WalletLedgerRepository;
 import com.smartdispatch.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -28,8 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +43,180 @@ public class PaymentService {
     private final NotificationService notificationService;
     private final PaymentOrchestrator orchestrator;
     private final WalletLedgerRepository walletLedgerRepository;
+    private final RazorpayPaymentProvider razorpayProvider;
+
+    @Value("${payment.razorpay.key-id}")
+    private String razorpayKeyId;
+
+    // ═══════════════════════════════════════════
+    // Get Available Providers
+    // ═══════════════════════════════════════════
+    public List<Map<String, String>> getAvailableProviders() {
+        return List.of(
+            Map.of("provider", "WALLET",   "displayName", "Fatafat Wallet"),
+            Map.of("provider", "RAZORPAY", "displayName", "Cards / UPI / NetBanking"),
+            Map.of("provider", "CASH_ON_DELIVERY", "displayName", "Cash on Delivery")
+        );
+    }
+
+    // ═══════════════════════════════════════════
+    // Create Payment Session (Step 1 for Gateway)
+    // ═══════════════════════════════════════════
+    @Transactional
+    public PaymentSessionResponse createPaymentSession(PaymentSessionRequest request) {
+        String email = SecurityUtil.getCurrentUserEmail();
+        User customer = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("Customer not found"));
+
+        Order order = orderRepository.findById(request.getOrderId())
+                .orElseThrow(() -> new BadRequestException("Order not found"));
+
+        // Idempotency: don't create duplicate sessions
+        String idempotencyKey = "PAY-" + order.getId() + "-" + customer.getId();
+        Optional<Payment> existing = paymentRepository.findByIdempotencyKey(idempotencyKey);
+        if (existing.isPresent()) {
+            Payment p = existing.get();
+            return PaymentSessionResponse.builder()
+                    .paymentId(p.getId())
+                    .transactionId(p.getTransactionId())
+                    .paymentSessionId(p.getProviderTransactionId())
+                    .key(razorpayKeyId)
+                    .orderId(p.getOrderId())
+                    .amount(p.getAmount())
+                    .currency("INR")
+                    .provider(request.getProvider().name())
+                    .build();
+        }
+
+        // Create internal payment record
+        Payment payment = Payment.builder()
+                .transactionId("TXN-" + UUID.randomUUID().toString().substring(0, 12).toUpperCase())
+                .idempotencyKey(idempotencyKey)
+                .orderId(order.getId())
+                .customerId(customer.getId())
+                .amount(order.getDeliveryFee())
+                .currency("INR")
+                .method(request.getProvider())
+                .status(PaymentStatus.INITIATED)
+                .build();
+
+        if (request.getProvider() == PaymentMethod.CASH_ON_DELIVERY) {
+            payment.setStatus(PaymentStatus.PENDING);
+            order.setStatus(OrderStatus.PAYMENT_PENDING);
+            orderRepository.save(order);
+            Payment saved = paymentRepository.save(payment);
+            return PaymentSessionResponse.builder()
+                    .paymentId(saved.getId()).transactionId(saved.getTransactionId())
+                    .orderId(order.getId()).amount(order.getDeliveryFee())
+                    .currency("INR").provider("CASH_ON_DELIVERY").build();
+        }
+
+        // For Razorpay: create Razorpay Order
+        PaymentProvider.PaymentResult result = razorpayProvider.processPayment(
+                order.getDeliveryFee(), customer.getId().toString(), order.getId().toString()
+        );
+
+        payment.setProviderTransactionId(result.transactionId()); // = Razorpay order_id
+        payment.setStatus(PaymentStatus.PROCESSING);
+        order.setStatus(OrderStatus.PAYMENT_PENDING);
+        orderRepository.save(order);
+        Payment saved = paymentRepository.save(payment);
+
+        log.info("[PAYMENT SESSION] Created. TxnID: {}, RazorpayOrderId: {}",
+                saved.getTransactionId(), result.transactionId());
+
+        return PaymentSessionResponse.builder()
+                .paymentId(saved.getId())
+                .transactionId(saved.getTransactionId())
+                .paymentSessionId(result.transactionId())  // Razorpay order_id for frontend
+                .key(razorpayKeyId)                         // Public key — safe to send
+                .orderId(order.getId())
+                .amount(order.getDeliveryFee())
+                .currency("INR")
+                .provider(request.getProvider().name())
+                .build();
+    }
+
+    // ═══════════════════════════════════════════
+    // Verify Payment (after frontend checkout)
+    // ═══════════════════════════════════════════
+    @Transactional
+    public PaymentResponse verifyPayment(PaymentVerifyRequest request) {
+        // Find payment by razorpay order_id (stored as providerTransactionId)
+        Payment payment = paymentRepository.findByProviderTransactionId(request.getRazorpayOrderId())
+                .orElseThrow(() -> new BadRequestException("Payment session not found"));
+
+        // Verify the signature
+        boolean valid = razorpayProvider.verifySignature(
+                request.getRazorpayOrderId(),
+                request.getRazorpayPaymentId(),
+                request.getRazorpaySignature()
+        );
+
+        if (!valid) {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setFailureReason("Invalid payment signature");
+            paymentRepository.save(payment);
+            throw new BadRequestException("Payment signature verification failed");
+        }
+
+        // Signature valid — mark as SUCCESS (webhook will also confirm)
+        payment.setStatus(PaymentStatus.SUCCESS);
+        payment.setGatewayPaymentId(request.getRazorpayPaymentId());
+        payment.setPaidAt(LocalDateTime.now());
+        paymentRepository.save(payment);
+
+        // Update order status to CONFIRMED
+        orderRepository.findById(payment.getOrderId()).ifPresent(order -> {
+            order.setStatus(OrderStatus.CONFIRMED);
+            orderRepository.save(order);
+            log.info("[VERIFY] Order {} confirmed after signature check.", order.getId());
+        });
+
+        log.info("[VERIFY] Payment {} verified successfully.", payment.getTransactionId());
+        return mapToResponse(payment);
+    }
+
+    // ═══════════════════════════════════════════
+    // Handle Webhook (Source of Truth)
+    // ═══════════════════════════════════════════
+    @Transactional
+    public void handleRazorpayWebhook(String razorpayPaymentId, String event) {
+        paymentRepository.findByGatewayPaymentId(razorpayPaymentId).ifPresent(payment -> {
+            if ("payment.captured".equals(event)) {
+                payment.setStatus(PaymentStatus.SUCCESS);
+                payment.setPaidAt(LocalDateTime.now());
+                paymentRepository.save(payment);
+
+                // Final order confirmation via webhook
+                orderRepository.findById(payment.getOrderId()).ifPresent(order -> {
+                    order.setStatus(OrderStatus.CONFIRMED);
+                    orderRepository.save(order);
+                });
+
+                // Update customer stats
+                userRepository.findById(payment.getCustomerId()).ifPresent(customer -> {
+                    customer.setTotalSpent(customer.getTotalSpent() + payment.getAmount().intValue());
+                    customer.setTotalOrders(customer.getTotalOrders() + 1);
+                    userRepository.save(customer);
+                    recordLedgerEntry(customer.getId(), payment.getAmount(), "DEBIT",
+                            "PAYMENT", payment.getOrderId().toString(),
+                            "Payment for order #" + payment.getOrderId());
+                });
+
+                log.info("[WEBHOOK] payment.captured confirmed. TxnID: {}", payment.getTransactionId());
+
+            } else if ("payment.failed".equals(event)) {
+                payment.setStatus(PaymentStatus.FAILED);
+                paymentRepository.save(payment);
+                orderRepository.findById(payment.getOrderId()).ifPresent(order -> {
+                    order.setStatus(OrderStatus.PAYMENT_FAILED);
+                    orderRepository.save(order);
+                });
+                log.warn("[WEBHOOK] payment.failed. TxnID: {}", payment.getTransactionId());
+            }
+        });
+    }
 
     // ═══════════════════════════════════════════
     // Process Payment (with Idempotency)
@@ -92,28 +267,35 @@ public class PaymentService {
         );
 
         if (result.success()) {
-            payment.setStatus(PaymentStatus.SUCCESS);
+            // For gateway payments (Razorpay etc): keep status PENDING until webhook confirms.
+            // For Wallet: mark SUCCESS immediately since deduction is instant.
+            boolean isGatewayPayment = (request.getMethod() != PaymentMethod.WALLET);
+            if (isGatewayPayment) {
+                payment.setStatus(PaymentStatus.PENDING);
+            } else {
+                payment.setStatus(PaymentStatus.SUCCESS);
+                payment.setPaidAt(LocalDateTime.now());
+                customer.setTotalSpent(customer.getTotalSpent() + order.getDeliveryFee().intValue());
+                customer.setTotalOrders(customer.getTotalOrders() + 1);
+                userRepository.save(customer);
+                recordLedgerEntry(customer.getId(), order.getDeliveryFee(), "DEBIT",
+                        "PAYMENT", order.getId().toString(), "Payment for order " + order.getTrackingNumber());
+                notificationService.sendNotification(
+                        customer.getId(), customer.getEmail(),
+                        NotificationTemplate.PAYMENT_SUCCESS, NotificationType.EMAIL,
+                        "/orders/" + order.getId(),
+                        String.valueOf(order.getDeliveryFee()), order.getTrackingNumber()
+                );
+            }
+
             payment.setProviderTransactionId(result.transactionId());
-            payment.setPaidAt(LocalDateTime.now());
+            // Store the payment URL for gateway redirect (e.g., Razorpay Payment Link)
+            if (result.paymentUrl() != null) {
+                payment.setPaymentUrl(result.paymentUrl());
+            }
 
-            // Update customer stats
-            customer.setTotalSpent(customer.getTotalSpent() + order.getDeliveryFee().intValue());
-            customer.setTotalOrders(customer.getTotalOrders() + 1);
-            userRepository.save(customer);
-
-            // Record ledger entry
-            recordLedgerEntry(customer.getId(), order.getDeliveryFee(), "DEBIT",
-                    "PAYMENT", order.getId().toString(), "Payment for order " + order.getTrackingNumber());
-
-            // Notification
-            notificationService.sendNotification(
-                    customer.getId(), customer.getEmail(),
-                    NotificationTemplate.PAYMENT_SUCCESS, NotificationType.EMAIL,
-                    "/orders/" + order.getId(),
-                    String.valueOf(order.getDeliveryFee()), order.getTrackingNumber()
-            );
-
-            log.info("Payment SUCCESS. TxnID: {}", payment.getTransactionId());
+            log.info("Payment initiated. Status: {}, TxnID: {}, URL: {}",
+                    payment.getStatus(), payment.getTransactionId(), result.paymentUrl());
         } else {
             payment.setStatus(PaymentStatus.FAILED);
             payment.setFailureReason(result.failureReason());
@@ -298,6 +480,7 @@ public class PaymentService {
                 .method(p.getMethod())
                 .status(p.getStatus())
                 .providerTransactionId(p.getProviderTransactionId())
+                .paymentUrl(p.getPaymentUrl())
                 .failureReason(p.getFailureReason())
                 .paidAt(p.getPaidAt())
                 .createdAt(p.getCreatedAt())

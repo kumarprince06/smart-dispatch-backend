@@ -86,7 +86,7 @@ public class Order {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private OrderStatus status = OrderStatus.CREATED;
+    private OrderStatus status = OrderStatus.REQUESTED;
 
     @Enumerated(EnumType.STRING)
     @Builder.Default
@@ -193,7 +193,7 @@ public class Order {
             trackingNumber = "SD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         }
         if (status == null) {
-            status = OrderStatus.CREATED;
+            status = OrderStatus.REQUESTED;
         }
     }
 

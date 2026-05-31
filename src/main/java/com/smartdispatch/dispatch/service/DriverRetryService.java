@@ -47,7 +47,7 @@ public class DriverRetryService {
     public void retryUnassignedOrders() {
         // Find orders stuck in CREATED status
         List<Order> unassigned = orderRepository.findByStatus(
-                OrderStatus.CREATED,
+                OrderStatus.REQUESTED,
                 org.springframework.data.domain.PageRequest.of(0, 50)
         ).getContent();
 
@@ -76,7 +76,7 @@ public class DriverRetryService {
 
                 // Double check status inside lock
                 Order lockedOrder = orderRepository.findById(order.getId()).orElse(order);
-                if (lockedOrder.getStatus() != OrderStatus.CREATED) {
+                if (lockedOrder.getStatus() != OrderStatus.REQUESTED) {
                      continue;
                 }
 
@@ -141,7 +141,7 @@ public class DriverRetryService {
                 }
 
                 Order lockedOrder = orderRepository.findById(order.getId()).orElse(order);
-                if (lockedOrder.getStatus() != OrderStatus.CREATED) {
+                if (lockedOrder.getStatus() != OrderStatus.REQUESTED) {
                      continue;
                 }
 

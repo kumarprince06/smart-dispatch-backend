@@ -62,8 +62,8 @@ payment:
     secret-key: sk_test_51MockStripeSecret456
     webhook-secret: whsec_MockStripeWebhook789
   razorpay:
-    key-id: rzp_test_MockRazorpayKey
-    key-secret: MockRazorpaySecretKey999
+    key-id: rzp_test_SvtxYe1ADNAZu8
+    key-secret: wcRd4pyS3uSr500eSa9vpSOp
     webhook-secret: mock_razorpay_webhook_secret
   paypal:
     client-id: mock_paypal_client_id_test

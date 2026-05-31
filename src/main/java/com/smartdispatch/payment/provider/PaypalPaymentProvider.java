@@ -23,13 +23,13 @@ public class PaypalPaymentProvider implements PaymentProvider {
     public PaymentResult processPayment(Double amount, String customerId, String orderId) {
         String txnId = "PPL-" + System.currentTimeMillis();
         log.info("[PAYPAL] Payment of ${} initiated. TxnID: {}", amount, txnId);
-        return new PaymentResult(true, txnId, null);
+        return new PaymentResult(true, txnId, null, null);
     }
 
     @Override
     public PaymentResult processRefund(String transactionId, Double amount) {
         log.info("[PAYPAL] Refund of ${} for txn: {}", amount, transactionId);
-        return new PaymentResult(true, "REF-" + transactionId, null);
+        return new PaymentResult(true, "REF-" + transactionId, null, null);
     }
 
     @Override

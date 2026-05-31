@@ -48,6 +48,9 @@ public class Payment {
 
     private String providerTransactionId;
 
+    @Column(name = "payment_url")
+    private String paymentUrl;
+
     private String failureReason;
 
     // Retry tracking

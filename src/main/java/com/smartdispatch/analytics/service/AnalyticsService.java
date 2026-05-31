@@ -45,7 +45,7 @@ public class AnalyticsService {
         Long todayOrders = orderRepository.countOrdersInRange(todayStart, todayEnd);
         Long deliveredOrders = orderRepository.countByStatus(OrderStatus.DELIVERED);
         Long cancelledOrders = orderRepository.countByStatus(OrderStatus.CANCELLED);
-        Long pendingOrders = orderRepository.countByStatus(OrderStatus.CREATED);
+        Long pendingOrders = orderRepository.countByStatus(OrderStatus.REQUESTED);
 
         Long activeOrders = orderRepository.countByStatus(OrderStatus.ASSIGNED)
                 + orderRepository.countByStatus(OrderStatus.PICKED_UP)

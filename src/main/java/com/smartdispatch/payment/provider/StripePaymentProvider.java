@@ -27,13 +27,13 @@ public class StripePaymentProvider implements PaymentProvider {
         // TODO: Integrate Stripe SDK — create PaymentIntent
         String txnId = "STR-" + System.currentTimeMillis();
         log.info("[STRIPE] Payment of ₹{} initiated. TxnID: {}", amount, txnId);
-        return new PaymentResult(true, txnId, null);
+        return new PaymentResult(true, txnId, null, null);
     }
 
     @Override
     public PaymentResult processRefund(String transactionId, Double amount) {
         log.info("[STRIPE] Refund of ₹{} for txn: {}", amount, transactionId);
-        return new PaymentResult(true, "REF-" + transactionId, null);
+        return new PaymentResult(true, "REF-" + transactionId, null, null);
     }
 
     @Override

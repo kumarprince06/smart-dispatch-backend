@@ -45,7 +45,7 @@ public class OrderEventConsumer {
         // Example: Send push notification or email based on the event status
         // This is decoupled from the main thread
         switch(event.getStatus()) {
-            case CREATED:
+            case REQUESTED:
                 // notificationService.sendEmail(...)
                 break;
             case DELIVERED:

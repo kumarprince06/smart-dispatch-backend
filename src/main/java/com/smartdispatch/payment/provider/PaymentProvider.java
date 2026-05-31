@@ -12,5 +12,5 @@ public interface PaymentProvider {
 
     String getProviderName();
 
-    record PaymentResult(boolean success, String transactionId, String failureReason) {}
+    record PaymentResult(boolean success, String transactionId, String paymentUrl, String failureReason) {}
 }
