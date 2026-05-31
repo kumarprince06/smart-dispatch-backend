@@ -1,6 +1,7 @@
 package com.smartdispatch.order.mapper;
 
 import com.smartdispatch.order.dto.OrderResponse;
+import com.smartdispatch.order.dto.OrderItemResponse;
 import com.smartdispatch.order.entity.Order;
 import com.smartdispatch.order.entity.OrderTimeline;
 import org.springframework.stereotype.Component;
@@ -74,6 +75,22 @@ public class OrderMapper {
                     .map(this::toTimelineEntry)
                     .toList();
             builder.timeline(timelineEntries);
+        }
+
+        // Items Breakdown list mapping
+        if (order.getItems() != null && !order.getItems().isEmpty()) {
+            List<OrderItemResponse> itemResponses = order.getItems().stream()
+                    .map(item -> OrderItemResponse.builder()
+                            .id(item.getId())
+                            .name(item.getName())
+                            .weightKg(item.getWeightKg())
+                            .lengthCm(item.getLengthCm())
+                            .widthCm(item.getWidthCm())
+                            .heightCm(item.getHeightCm())
+                            .quantity(item.getQuantity())
+                            .build())
+                    .toList();
+            builder.items(itemResponses);
         }
 
         return builder.build();

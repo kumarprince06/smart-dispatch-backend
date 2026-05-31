@@ -136,6 +136,22 @@ public class OrderService {
                 .surgeMultiplier(activeSurgeMultiplier)
                 .build();
 
+        // Save order items natively in database
+        if (request.getItems() != null && !request.getItems().isEmpty()) {
+            java.util.List<com.smartdispatch.order.entity.OrderItem> orderItems = request.getItems().stream()
+                    .map(itemReq -> com.smartdispatch.order.entity.OrderItem.builder()
+                            .order(order)
+                            .name(itemReq.getName())
+                            .weightKg(itemReq.getWeightKg())
+                            .lengthCm(itemReq.getLengthCm())
+                            .widthCm(itemReq.getWidthCm())
+                            .heightCm(itemReq.getHeightCm())
+                            .quantity(itemReq.getQuantity() != null ? itemReq.getQuantity() : 1)
+                            .build())
+                    .collect(java.util.stream.Collectors.toList());
+            order.setItems(orderItems);
+        }
+
         // Try auto-assign driver via Redis GEO Dispatch Engine
         try {
             DispatchResult result = dispatchService.findNearestDriver(

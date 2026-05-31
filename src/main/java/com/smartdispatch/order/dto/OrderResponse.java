@@ -73,6 +73,9 @@ public class OrderResponse {
     // Timeline
     private List<TimelineEntry> timeline;
 
+    // Multiple Items list
+    private java.util.List<OrderItemResponse> items;
+
     // Timestamps
     private LocalDateTime assignedAt;
     private LocalDateTime pickedUpAt;

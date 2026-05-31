@@ -55,4 +55,7 @@ public class CreateOrderRequest {
 
     // Notes
     private String customerNotes;
+
+    // Multiple Items list
+    private java.util.List<OrderItemRequest> items;
 }
