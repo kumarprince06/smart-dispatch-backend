@@ -16,6 +16,7 @@ import com.smartdispatch.payment.enums.PaymentMethod;
 import com.smartdispatch.payment.enums.PaymentStatus;
 import com.smartdispatch.payment.orchestrator.PaymentOrchestrator;
 import com.smartdispatch.payment.provider.PaymentProvider;
+import com.smartdispatch.payment.provider.PaystackPaymentProvider;
 import com.smartdispatch.payment.provider.RazorpayPaymentProvider;
 import com.smartdispatch.payment.repository.PaymentRepository;
 import com.smartdispatch.payment.repository.WalletLedgerRepository;
@@ -46,6 +47,7 @@ public class PaymentService {
     private final RazorpayPaymentProvider razorpayProvider;
     private final com.smartdispatch.payment.provider.StripePaymentProvider stripeProvider;
     private final com.smartdispatch.payment.provider.PayUPaymentProvider payuProvider;
+    private final PaystackPaymentProvider paystackProvider;
 
     @Value("${payment.razorpay.key-id}")
     private String razorpayKeyId;
@@ -59,6 +61,7 @@ public class PaymentService {
             Map.of("provider", "RAZORPAY", "displayName", "Razorpay (Cards / UPI / NetBanking)"),
             Map.of("provider", "PAYU", "displayName", "PayU (Cards / UPI)"),
             Map.of("provider", "STRIPE", "displayName", "Stripe (International Cards)"),
+            Map.of("provider", "PAYSTACK", "displayName", "Paystack (Cards / Mobile Money / Bank)"),
             Map.of("provider", "CASH_ON_DELIVERY", "displayName", "Cash on Delivery")
         );
     }
@@ -128,6 +131,11 @@ public class PaymentService {
                     order.getDeliveryFee(), customer.getId().toString(), order.getId().toString()
             );
             publicKey = result.paymentUrl(); // Same as Stripe, PayU URL is in paymentUrl
+        } else if (request.getProvider() == PaymentMethod.PAYSTACK) {
+            result = paystackProvider.processPayment(
+                    order.getDeliveryFee(), customer.getId().toString(), order.getId().toString()
+            );
+            publicKey = paystackProvider.getPublicKey();
         } else {
             // Default to Razorpay
             result = razorpayProvider.processPayment(
@@ -199,6 +207,103 @@ public class PaymentService {
 
         log.info("[VERIFY] Payment {} verified successfully.", payment.getTransactionId());
         return mapToResponse(payment);
+    }
+
+    // ═══════════════════════════════════════════
+    // Verify Paystack Payment (after frontend redirect)
+    // ═══════════════════════════════════════════
+    @Transactional
+    public PaymentResponse verifyPaystackPayment(String reference) {
+        // Find payment by Paystack reference (stored as providerTransactionId)
+        Payment payment = paymentRepository.findByProviderTransactionId(reference)
+                .orElseThrow(() -> new BadRequestException("Payment not found for Paystack reference: " + reference));
+
+        // Call Paystack Verify API
+        PaystackPaymentProvider.VerificationResult verification = paystackProvider.verifyTransaction(reference);
+
+        if (!verification.success()) {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setFailureReason("Paystack verification failed: " + verification.gatewayResponse());
+            paymentRepository.save(payment);
+            throw new BadRequestException("Paystack payment verification failed: " + verification.gatewayResponse());
+        }
+
+        // Mark as SUCCESS
+        payment.setStatus(PaymentStatus.SUCCESS);
+        payment.setGatewayPaymentId(verification.paystackTransactionId());
+        payment.setPaidAt(LocalDateTime.now());
+        paymentRepository.save(payment);
+
+        // Update order status to CONFIRMED
+        orderRepository.findById(payment.getOrderId()).ifPresent(order -> {
+            order.setStatus(OrderStatus.CONFIRMED);
+            orderRepository.save(order);
+            log.info("[PAYSTACK VERIFY] Order {} confirmed.", order.getId());
+        });
+
+        // Update customer stats
+        userRepository.findById(payment.getCustomerId()).ifPresent(customer -> {
+            customer.setTotalSpent(customer.getTotalSpent() + payment.getAmount().intValue());
+            customer.setTotalOrders(customer.getTotalOrders() + 1);
+            userRepository.save(customer);
+            recordLedgerEntry(customer.getId(), payment.getAmount(), "DEBIT",
+                    "PAYMENT", payment.getOrderId().toString(),
+                    "Paystack payment for order #" + payment.getOrderId());
+        });
+
+        log.info("[PAYSTACK VERIFY] Payment {} verified. Channel: {}", payment.getTransactionId(), verification.channel());
+        return mapToResponse(payment);
+    }
+
+    // ═══════════════════════════════════════════
+    // Handle Paystack Webhook (Source of Truth)
+    // ═══════════════════════════════════════════
+    @Transactional
+    public void handlePaystackWebhook(String reference, String event, String paystackTxnId) {
+        paymentRepository.findByProviderTransactionId(reference).ifPresent(payment -> {
+            if ("charge.success".equals(event)) {
+                payment.setStatus(PaymentStatus.SUCCESS);
+                payment.setGatewayPaymentId(paystackTxnId);
+                payment.setPaidAt(LocalDateTime.now());
+                paymentRepository.save(payment);
+
+                // Final order confirmation via webhook
+                orderRepository.findById(payment.getOrderId()).ifPresent(order -> {
+                    order.setStatus(OrderStatus.CONFIRMED);
+                    orderRepository.save(order);
+                });
+
+                // Update customer stats
+                userRepository.findById(payment.getCustomerId()).ifPresent(customer -> {
+                    customer.setTotalSpent(customer.getTotalSpent() + payment.getAmount().intValue());
+                    customer.setTotalOrders(customer.getTotalOrders() + 1);
+                    userRepository.save(customer);
+                    recordLedgerEntry(customer.getId(), payment.getAmount(), "DEBIT",
+                            "PAYMENT", payment.getOrderId().toString(),
+                            "Paystack payment for order #" + payment.getOrderId());
+                });
+
+                log.info("[PAYSTACK WEBHOOK] charge.success confirmed. Ref: {}", reference);
+
+            } else if ("charge.failed".equals(event)) {
+                payment.setStatus(PaymentStatus.FAILED);
+                payment.setFailureReason("Paystack charge failed");
+                paymentRepository.save(payment);
+
+                orderRepository.findById(payment.getOrderId()).ifPresent(order -> {
+                    order.setStatus(OrderStatus.PAYMENT_FAILED);
+                    orderRepository.save(order);
+                });
+
+                log.warn("[PAYSTACK WEBHOOK] charge.failed. Ref: {}", reference);
+
+            } else if ("refund.processed".equals(event)) {
+                payment.setStatus(PaymentStatus.REFUNDED);
+                payment.setRefundedAt(LocalDateTime.now());
+                paymentRepository.save(payment);
+                log.info("[PAYSTACK WEBHOOK] refund.processed. Ref: {}", reference);
+            }
+        });
     }
 
     // ═══════════════════════════════════════════

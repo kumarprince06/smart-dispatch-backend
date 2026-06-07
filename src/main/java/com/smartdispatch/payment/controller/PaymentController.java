@@ -59,6 +59,19 @@ public class PaymentController {
                 .data(response).build());
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // Step 2b: Verify Paystack Payment (after Paystack Checkout redirect)
+    // ─────────────────────────────────────────────────────────────────
+    @PostMapping("/verify/paystack")
+    public ResponseEntity<ApiResponse<PaymentResponse>> verifyPaystackPayment(
+            @RequestParam String reference
+    ) {
+        PaymentResponse response = paymentService.verifyPaystackPayment(reference);
+        return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
+                .success(true).message("Paystack payment verified successfully").status(200)
+                .data(response).build());
+    }
+
 
     @PostMapping
     public ResponseEntity<ApiResponse<PaymentResponse>> processPayment(
