@@ -112,7 +112,9 @@ public class DriverRetryService {
                             lockedOrder.getId(), driver.getId(), lockedOrder.getAssignmentAttempts());
                 }
             } catch (BadRequestException e) {
-                order.setAssignmentAttempts(order.getAssignmentAttempts() + 1);
+                if (e.getMessage() == null || !e.getMessage().contains("No drivers available")) {
+                    order.setAssignmentAttempts(order.getAssignmentAttempts() + 1);
+                }
                 order.setLastAssignmentAttemptAt(LocalDateTime.now());
                 orderRepository.save(order);
 

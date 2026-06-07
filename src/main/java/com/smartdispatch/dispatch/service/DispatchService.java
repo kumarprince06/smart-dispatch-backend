@@ -42,6 +42,26 @@ public class DispatchService {
             DispatchStrategy strategy
     ) {
         long startTime = System.currentTimeMillis();
+        
+        // Self-healing: Sync available database drivers to Redis GEO index
+        try {
+            List<Driver> activeDbDrivers = driverRepository.findAll();
+            for (Driver driver : activeDbDrivers) {
+                if (driver.getStatus() == DriverStatus.AVAILABLE &&
+                        driver.getVerificationStatus() == VerificationStatus.VERIFIED &&
+                        driver.getActive() &&
+                        driver.getCurrentLatitude() != null &&
+                        driver.getCurrentLongitude() != null) {
+                    if (!geoLocationService.isDriverActive(driver.getId())) {
+                        log.info("Self-healing: Seeding active database driver {} into Redis GEO index", driver.getId());
+                        geoLocationService.updateDriverLocation(driver.getId(), driver.getCurrentLatitude(), driver.getCurrentLongitude());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to self-heal/seed drivers into Redis GEO: {}", e.getMessage());
+        }
+
         int totalSearched = 0;
 
         // Expanding radius search
