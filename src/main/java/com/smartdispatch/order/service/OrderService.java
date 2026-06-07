@@ -188,6 +188,28 @@ public class OrderService {
 
         log.info("Order created. ID: {}, Tracking: {}", savedOrder.getId(), savedOrder.getTrackingNumber());
 
+        // Send SMS notification to receiver immediately on order creation
+        if (savedOrder.getDropContactPhone() != null && !savedOrder.getDropContactPhone().trim().isEmpty()) {
+            try {
+                String receiverName = savedOrder.getDropContactName() != null && !savedOrder.getDropContactName().trim().isEmpty()
+                        ? savedOrder.getDropContactName() : "Receiver";
+                String customerName = savedOrder.getCustomer().getFirstName() + " " + savedOrder.getCustomer().getLastName();
+                String message = String.format("Hello %s, %s has booked a delivery for you! Tracking: %s.",
+                        receiverName, customerName, savedOrder.getTrackingNumber());
+                
+                notificationService.sendCustom(
+                        savedOrder.getCustomer().getId(),
+                        savedOrder.getDropContactPhone(),
+                        "New Delivery Booked",
+                        message,
+                        NotificationType.SMS,
+                        "/orders/" + savedOrder.getId()
+                );
+            } catch (Exception e) {
+                log.error("Failed to send initial SMS to receiver: {}", e.getMessage());
+            }
+        }
+
         // Send Push Notification if assigned
         if (savedOrder.getStatus() == OrderStatus.ASSIGNED && savedOrder.getDriver() != null) {
             String fcmToken = savedOrder.getDriver().getUser().getFcmToken() != null 
