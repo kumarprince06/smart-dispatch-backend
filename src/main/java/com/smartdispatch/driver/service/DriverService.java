@@ -422,6 +422,13 @@ public class DriverService {
             driver.setLastActiveAt(LocalDateTime.now());
         }
 
+        // Sync to Redis: remove from geo index when going offline/suspended/blocked
+        if (request.getStatus() == DriverStatus.OFFLINE
+                || request.getStatus() == DriverStatus.SUSPENDED
+                || request.getStatus() == DriverStatus.BLOCKED) {
+            geoLocationService.removeDriver(driver.getId());
+        }
+
         Driver updated = driverRepository.save(driver);
         log.info("Driver status updated: {} -> {}", email, request.getStatus());
         return driverMapper.toResponse(updated);
@@ -440,6 +447,9 @@ public class DriverService {
         driver.setCurrentLongitude(request.getLongitude());
         driver.setLocationUpdatedAt(LocalDateTime.now());
         driver.setLastActiveAt(LocalDateTime.now());
+
+        // Sync to Redis GEO (real-time cache)
+        geoLocationService.updateDriverLocation(driver.getId(), request.getLatitude(), request.getLongitude());
 
         Driver updated = driverRepository.save(driver);
         return driverMapper.toResponse(updated);

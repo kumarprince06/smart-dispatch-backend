@@ -58,10 +58,14 @@ public class OrderService {
     private final PricingService pricingService;
     private final NotificationService notificationService;
     private final OrderMapper orderMapper;
+    private final com.smartdispatch.payment.repository.PaymentRepository paymentRepository;
 
     // Valid state transitions (State Machine)
     private static final Map<OrderStatus, Set<OrderStatus>> VALID_TRANSITIONS = Map.of(
-            OrderStatus.REQUESTED, Set.of(OrderStatus.ASSIGNED, OrderStatus.CANCELLED),
+            OrderStatus.REQUESTED, Set.of(OrderStatus.ASSIGNED, OrderStatus.PAYMENT_PENDING, OrderStatus.CANCELLED),
+            OrderStatus.PAYMENT_PENDING, Set.of(OrderStatus.CONFIRMED, OrderStatus.PAYMENT_FAILED, OrderStatus.CANCELLED),
+            OrderStatus.PAYMENT_FAILED, Set.of(OrderStatus.PAYMENT_PENDING, OrderStatus.CANCELLED),
+            OrderStatus.CONFIRMED, Set.of(OrderStatus.ASSIGNED, OrderStatus.CANCELLED),
             OrderStatus.ASSIGNED, Set.of(OrderStatus.PICKED_UP, OrderStatus.CANCELLED),
             OrderStatus.PICKED_UP, Set.of(OrderStatus.IN_TRANSIT, OrderStatus.CANCELLED),
             OrderStatus.IN_TRANSIT, Set.of(OrderStatus.DELIVERED, OrderStatus.FAILED),
@@ -267,8 +271,15 @@ public class OrderService {
     public OrderResponse manuallyAssignDriver(Long orderId, AssignDriverRequest request) {
         Order order = findOrderOrThrow(orderId);
 
-        if (order.getStatus() != OrderStatus.REQUESTED) {
-            throw new BadRequestException("Only REQUESTED orders can be manually assigned. Current status: " + order.getStatus());
+        boolean isEligible = order.getStatus() == OrderStatus.REQUESTED ||
+                order.getStatus() == OrderStatus.CONFIRMED ||
+                (order.getStatus() == OrderStatus.PAYMENT_PENDING &&
+                paymentRepository.findByOrderId(order.getId())
+                        .map(p -> p.getMethod() == com.smartdispatch.payment.enums.PaymentMethod.CASH_ON_DELIVERY)
+                        .orElse(false));
+
+        if (!isEligible) {
+            throw new BadRequestException("Order is not in an assignable status (REQUESTED, CONFIRMED, or COD). Current status: " + order.getStatus());
         }
 
         Driver driver = driverRepository.findById(request.getDriverId())
@@ -321,7 +332,9 @@ public class OrderService {
 
         // OTP verification for PICKED_UP
         if (request.getStatus() == OrderStatus.PICKED_UP) {
-            if (request.getOtp() == null || !request.getOtp().equals(order.getPickupOtp())) {
+            log.info("[OTP VERIFICATION] Comparing pickup OTP. Request: '{}', DB: '{}' for Order {}",
+                    request.getOtp(), order.getPickupOtp(), orderId);
+            if (request.getOtp() == null || !request.getOtp().trim().equals(order.getPickupOtp())) {
                 throw new BadRequestException("Invalid pickup OTP");
             }
             order.setPickedUpAt(LocalDateTime.now());
@@ -329,7 +342,9 @@ public class OrderService {
 
         // OTP verification for DELIVERED
         if (request.getStatus() == OrderStatus.DELIVERED) {
-            if (request.getOtp() == null || !request.getOtp().equals(order.getDeliveryOtp())) {
+            log.info("[OTP VERIFICATION] Comparing delivery OTP. Request: '{}', DB: '{}' for Order {}",
+                    request.getOtp(), order.getDeliveryOtp(), orderId);
+            if (request.getOtp() == null || !request.getOtp().trim().equals(order.getDeliveryOtp())) {
                 throw new BadRequestException("Invalid delivery OTP");
             }
             if (request.getProofOfDeliveryUrl() != null) {
@@ -361,6 +376,72 @@ public class OrderService {
         // 🔴 REAL-TIME: Publish event to Kafka
         publishOrderEvent(updated);
 
+        // Send notifications based on new status
+        try {
+            String customerFcm = updated.getCustomer().getFcmToken() != null 
+                    ? updated.getCustomer().getFcmToken() 
+                    : updated.getCustomer().getId().toString();
+
+            if (request.getStatus() == OrderStatus.ASSIGNED) {
+                notificationService.sendNotification(
+                        updated.getCustomer().getId(),
+                        customerFcm,
+                        NotificationTemplate.ORDER_ASSIGNED,
+                        NotificationType.PUSH,
+                        "/orders/" + updated.getId(),
+                        updated.getDriver() != null ? (updated.getDriver().getUser().getFirstName() + " " + updated.getDriver().getUser().getLastName()) : "Rider",
+                        updated.getTrackingNumber()
+                );
+            } else if (request.getStatus() == OrderStatus.PICKED_UP) {
+                notificationService.sendNotification(
+                        updated.getCustomer().getId(),
+                        customerFcm,
+                        NotificationTemplate.ORDER_PICKED_UP,
+                        NotificationType.PUSH,
+                        "/orders/" + updated.getId(),
+                        updated.getTrackingNumber()
+                );
+
+                // Also send SMS to receiver with Delivery OTP
+                if (updated.getDropContactPhone() != null && !updated.getDropContactPhone().trim().isEmpty()) {
+                    String receiverName = updated.getDropContactName() != null && !updated.getDropContactName().trim().isEmpty()
+                            ? updated.getDropContactName() : "Receiver";
+                    String customerName = updated.getCustomer().getFirstName() + " " + updated.getCustomer().getLastName();
+                    String message = String.format("Hello %s, your package from %s is on the way! Share delivery OTP %s with the rider to verify delivery. Track here: %s",
+                            receiverName, customerName, updated.getDeliveryOtp(), updated.getTrackingNumber());
+                    
+                    notificationService.sendCustom(
+                            updated.getCustomer().getId(),
+                            updated.getDropContactPhone(),
+                            "Delivery Verification OTP",
+                            message,
+                            NotificationType.SMS,
+                            "/orders/" + updated.getId()
+                    );
+                }
+            } else if (request.getStatus() == OrderStatus.IN_TRANSIT) {
+                notificationService.sendNotification(
+                        updated.getCustomer().getId(),
+                        customerFcm,
+                        NotificationTemplate.ORDER_IN_TRANSIT,
+                        NotificationType.PUSH,
+                        "/orders/" + updated.getId(),
+                        updated.getTrackingNumber()
+                );
+            } else if (request.getStatus() == OrderStatus.DELIVERED) {
+                notificationService.sendNotification(
+                        updated.getCustomer().getId(),
+                        customerFcm,
+                        NotificationTemplate.ORDER_DELIVERED,
+                        NotificationType.PUSH,
+                        "/orders/" + updated.getId(),
+                        updated.getTrackingNumber()
+                );
+            }
+        } catch (Exception e) {
+            log.error("Failed to send customer status update notifications for order {}: {}", orderId, e.getMessage());
+        }
+
         return orderMapper.toResponse(updated);
     }
 
@@ -391,6 +472,39 @@ public class OrderService {
 
         orderRepository.save(order);
         addTimelineEntry(order, OrderStatus.CANCELLED, "Cancelled: " + request.getReason(), SecurityUtil.getCurrentUserEmail());
+
+        // Send cancellation notifications
+        try {
+            String customerFcm = order.getCustomer().getFcmToken() != null 
+                    ? order.getCustomer().getFcmToken() 
+                    : order.getCustomer().getId().toString();
+            
+            notificationService.sendNotification(
+                    order.getCustomer().getId(),
+                    customerFcm,
+                    NotificationTemplate.ORDER_CANCELLED,
+                    NotificationType.PUSH,
+                    "/orders/" + order.getId(),
+                    order.getTrackingNumber(),
+                    request.getReason()
+            );
+
+            if (order.getDriver() != null) {
+                String driverFcm = order.getDriver().getUser().getFcmToken() != null 
+                        ? order.getDriver().getUser().getFcmToken() 
+                        : order.getDriver().getUser().getId().toString();
+                notificationService.sendNotification(
+                        order.getDriver().getUser().getId(),
+                        driverFcm,
+                        NotificationTemplate.DRIVER_ORDER_CANCELLED,
+                        NotificationType.PUSH,
+                        "/orders/" + order.getId(),
+                        order.getTrackingNumber()
+                );
+            }
+        } catch (Exception e) {
+            log.error("Failed to send order cancellation notifications for order {}: {}", orderId, e.getMessage());
+        }
 
         log.info("Order {} cancelled. Reason: {}", orderId, request.getReason());
     }

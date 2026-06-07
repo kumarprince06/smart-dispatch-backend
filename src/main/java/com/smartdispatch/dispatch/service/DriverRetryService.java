@@ -35,6 +35,7 @@ public class DriverRetryService {
     private final DriverService driverService;
     private final DispatchService dispatchService;
     private final org.redisson.api.RedissonClient redissonClient;
+    private final com.smartdispatch.payment.repository.PaymentRepository paymentRepository;
 
     private static final int ASSIGNMENT_TIMEOUT_SECONDS = 60; // Driver must accept within 60s
 
@@ -45,9 +46,8 @@ public class DriverRetryService {
     @Scheduled(fixedDelay = 30000)
     @Transactional
     public void retryUnassignedOrders() {
-        // Find orders stuck in CREATED status
-        List<Order> unassigned = orderRepository.findByStatus(
-                OrderStatus.REQUESTED,
+        // Find orders needing assignment (REQUESTED, CONFIRMED, or COD PAYMENT_PENDING)
+        List<Order> unassigned = orderRepository.findOrdersNeedingAssignment(
                 org.springframework.data.domain.PageRequest.of(0, 50)
         ).getContent();
 
@@ -76,7 +76,16 @@ public class DriverRetryService {
 
                 // Double check status inside lock
                 Order lockedOrder = orderRepository.findById(order.getId()).orElse(order);
-                if (lockedOrder.getStatus() != OrderStatus.REQUESTED) {
+                boolean isEligible = lockedOrder.getDriver() == null && (
+                        lockedOrder.getStatus() == OrderStatus.REQUESTED ||
+                        lockedOrder.getStatus() == OrderStatus.CONFIRMED ||
+                        (lockedOrder.getStatus() == OrderStatus.PAYMENT_PENDING &&
+                        paymentRepository.findByOrderId(lockedOrder.getId())
+                                .map(p -> p.getMethod() == com.smartdispatch.payment.enums.PaymentMethod.CASH_ON_DELIVERY)
+                                .orElse(false))
+                );
+
+                if (!isEligible) {
                      continue;
                 }
 
@@ -141,7 +150,16 @@ public class DriverRetryService {
                 }
 
                 Order lockedOrder = orderRepository.findById(order.getId()).orElse(order);
-                if (lockedOrder.getStatus() != OrderStatus.REQUESTED) {
+                boolean isEligible = lockedOrder.getDriver() == null && (
+                        lockedOrder.getStatus() == OrderStatus.REQUESTED ||
+                        lockedOrder.getStatus() == OrderStatus.CONFIRMED ||
+                        (lockedOrder.getStatus() == OrderStatus.PAYMENT_PENDING &&
+                        paymentRepository.findByOrderId(lockedOrder.getId())
+                                .map(p -> p.getMethod() == com.smartdispatch.payment.enums.PaymentMethod.CASH_ON_DELIVERY)
+                                .orElse(false))
+                );
+
+                if (!isEligible) {
                      continue;
                 }
 

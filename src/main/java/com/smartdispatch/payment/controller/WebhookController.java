@@ -89,12 +89,12 @@ public class WebhookController {
     }
 
     // ═══════════════════════════════════════════
-    // PayPal Webhook
+    // Paystack Webhook
     // ═══════════════════════════════════════════
-    @PostMapping("/paypal")
-    public ResponseEntity<Void> paypalWebhook(@RequestBody Map<String, Object> payload) {
-        log.info("[WEBHOOK] PayPal event received");
-        // TODO: Verify PayPal webhook signature
+    @PostMapping("/paystack")
+    public ResponseEntity<Void> paystackWebhook(@RequestBody Map<String, Object> payload) {
+        log.info("[WEBHOOK] Paystack event received");
+        // TODO: Verify Paystack webhook signature
         return ResponseEntity.ok().build();
     }
 

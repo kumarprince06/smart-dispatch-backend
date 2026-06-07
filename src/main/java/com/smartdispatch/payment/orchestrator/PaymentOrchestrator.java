@@ -25,8 +25,8 @@ public class PaymentOrchestrator {
     // Fallback chain: if primary fails, try next
     private final Map<PaymentMethod, PaymentMethod> fallbackChain = Map.of(
             PaymentMethod.RAZORPAY, PaymentMethod.CASHFREE,
-            PaymentMethod.STRIPE, PaymentMethod.PAYPAL,
-            PaymentMethod.PAYPAL, PaymentMethod.STRIPE,
+            PaymentMethod.STRIPE, PaymentMethod.PAYSTACK,
+            PaymentMethod.PAYSTACK, PaymentMethod.STRIPE,
             PaymentMethod.CASHFREE, PaymentMethod.RAZORPAY
     );
 
@@ -34,14 +34,14 @@ public class PaymentOrchestrator {
             @Qualifier("walletProvider") PaymentProvider walletProvider,
             @Qualifier("razorpayProvider") PaymentProvider razorpayProvider,
             @Qualifier("stripeProvider") PaymentProvider stripeProvider,
-            @Qualifier("paypalProvider") PaymentProvider paypalProvider,
+            @Qualifier("paystackProvider") PaymentProvider paystackProvider,
             @Qualifier("cashfreeProvider") PaymentProvider cashfreeProvider
     ) {
         this.providers = new LinkedHashMap<>();
         providers.put(PaymentMethod.WALLET, walletProvider);
         providers.put(PaymentMethod.RAZORPAY, razorpayProvider);
         providers.put(PaymentMethod.STRIPE, stripeProvider);
-        providers.put(PaymentMethod.PAYPAL, paypalProvider);
+        providers.put(PaymentMethod.PAYSTACK, paystackProvider);
         providers.put(PaymentMethod.CASHFREE, cashfreeProvider);
     }
 
@@ -90,7 +90,7 @@ public class PaymentOrchestrator {
         return switch (countryCode.toUpperCase()) {
             case "IN" -> PaymentMethod.RAZORPAY;
             case "US", "CA", "GB", "AU" -> PaymentMethod.STRIPE;
-            case "DE", "FR", "IT", "ES" -> PaymentMethod.PAYPAL;
+            case "NG", "GH", "KE", "ZA" -> PaymentMethod.PAYSTACK;
             default -> PaymentMethod.STRIPE; // Global default
         };
     }

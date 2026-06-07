@@ -70,9 +70,9 @@ payment:
     key-id: ${RAZORPAY_KEY_ID}
     key-secret: ${RAZORPAY_KEY_SECRET}
     webhook-secret: ${RAZORPAY_WEBHOOK_SECRET}
-  paypal:
-    client-id: mock_paypal_client_id_test
-    client-secret: mock_paypal_client_secret_test
+  paystack:
+    public-key: ${PAYSTACK_PUBLIC_KEY:mock_paystack_public_key}
+    secret-key: ${PAYSTACK_SECRET_KEY:mock_paystack_secret_key}
   cashfree:
     app-id: mock_cashfree_app_id_test
     secret-key: mock_cashfree_secret_key_test
@@ -93,7 +93,7 @@ resilience4j:
         baseConfig: default
       razorpay:
         baseConfig: default
-      paypal:
+      paystack:
         baseConfig: default
       cashfree:
         baseConfig: default

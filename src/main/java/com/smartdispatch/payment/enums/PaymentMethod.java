@@ -4,7 +4,7 @@ public enum PaymentMethod {
     WALLET,
     RAZORPAY,
     STRIPE,
-    PAYPAL,
+    PAYSTACK,
     CASHFREE,
     PAYU,
     UPI,

@@ -16,24 +16,19 @@ public class PayUPaymentProvider implements PaymentProvider {
     @Value("${payment.payu.salt}")
     private String salt;
 
+    @Value("${app.backend-url:http://192.168.1.10:8080}")
+    private String backendUrl;
+
     @Override
     @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "payu", fallbackMethod = "fallbackPayment")
     public PaymentResult processPayment(Double amount, String customerId, String orderId) {
         try {
-            String txnid = "TXN-" + System.currentTimeMillis();
-            String productInfo = "Smart Dispatch Order " + orderId;
-            String firstName = "Customer"; // Usually fetch from DB
-            String email = "customer@example.com"; 
-
-            // PayU Hash sequence: key|txnid|amount|productinfo|firstname|email|||||||||||salt
-            String hashString = key + "|" + txnid + "|" + amount + "|" + productInfo + "|" + firstName + "|" + email + "|||||||||||" + salt;
-            String hash = hashCal("SHA-512", hashString);
-
-            // Construct PayU redirect URL. For test environment: https://test.payu.in/_payment
-            // We return a mock form redirect URL that frontend can open
-            String payuUrl = "https://test.payu.in/_payment?key=" + key + "&txnid=" + txnid + "&amount=" + amount + "&productinfo=" + productInfo + "&firstname=" + firstName + "&email=" + email + "&hash=" + hash;
+            String txnid = "PAYU-" + System.currentTimeMillis();
             
-            log.info("[PAYU] Payment hash generated for Order {}", orderId);
+            // Generate checkout url hosted by our backend to auto-POST to PayU
+            String payuUrl = backendUrl + "/api/v1/payments/payu/checkout?txnid=" + txnid;
+            
+            log.info("[PAYU] Payment session generated for Order {}. Redirect URL: {}", orderId, payuUrl);
             return new PaymentResult(true, txnid, payuUrl, null);
 
         } catch (Exception e) {
@@ -68,6 +63,10 @@ public class PayUPaymentProvider implements PaymentProvider {
     public String getProviderName() {
         return "PAYU";
     }
+
+    public String getKey() { return key; }
+    public String getSalt() { return salt; }
+    public String getBackendUrl() { return backendUrl; }
 
     public PaymentResult fallbackPayment(Double amount, String customerId, String orderId, Throwable t) {
         throw new RuntimeException("PayU unavailable", t);

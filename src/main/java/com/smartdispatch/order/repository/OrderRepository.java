@@ -22,6 +22,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Page<Order> findByStatus(OrderStatus status, Pageable pageable);
 
     @EntityGraph(attributePaths = {"customer", "driver"})
+    @Query("SELECT o FROM Order o WHERE o.driver IS NULL AND " +
+           "(o.status IN (com.smartdispatch.order.enums.OrderStatus.REQUESTED, com.smartdispatch.order.enums.OrderStatus.CONFIRMED) OR " +
+           "(o.status = com.smartdispatch.order.enums.OrderStatus.PAYMENT_PENDING AND " +
+           "EXISTS (SELECT p FROM Payment p WHERE p.orderId = o.id AND p.method = com.smartdispatch.payment.enums.PaymentMethod.CASH_ON_DELIVERY)))")
+    Page<Order> findOrdersNeedingAssignment(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"customer", "driver"})
     Page<Order> findByCustomerEmail(String email, Pageable pageable);
 
     @EntityGraph(attributePaths = {"customer", "driver"})
@@ -57,7 +64,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Long countActiveOrdersByDriverId(@Param("driverId") Long driverId);
 
     // Scheduled orders that are due for dispatch
-    @Query("SELECT o FROM Order o WHERE o.isScheduled = true AND o.status = 'CREATED' AND o.scheduledAt <= :now")
+    @Query("SELECT o FROM Order o WHERE o.isScheduled = true AND o.status IN (com.smartdispatch.order.enums.OrderStatus.REQUESTED, com.smartdispatch.order.enums.OrderStatus.CONFIRMED) AND o.scheduledAt <= :now")
     List<Order> findScheduledOrdersDue(@Param("now") LocalDateTime now);
 
     // ═══════════════════════════════════════════

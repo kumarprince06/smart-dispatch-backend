@@ -1,0 +1,4 @@
+ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_method_check;
+
+ALTER TABLE payments ADD CONSTRAINT payments_method_check
+CHECK (method IN ('WALLET', 'RAZORPAY', 'STRIPE', 'PAYSTACK', 'CASHFREE', 'PAYU', 'UPI', 'CARD', 'NET_BANKING', 'CASH_ON_DELIVERY'));
