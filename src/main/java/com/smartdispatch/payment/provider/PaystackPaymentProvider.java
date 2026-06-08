@@ -60,7 +60,7 @@ public class PaystackPaymentProvider implements PaymentProvider {
 
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("amount", amountInSmallestUnit);
-            requestBody.put("currency", "NGN"); // Default to NGN for African market
+            // Default to merchant's primary currency (omitting 'currency' parameter)
             requestBody.put("email", "customer_" + customerId + "@smartdispatch.com"); // Paystack requires email
             requestBody.put("reference", "SD-" + orderId + "-" + System.currentTimeMillis());
             requestBody.put("callback_url", "smartdispatch://payment-success?orderId=" + orderId);

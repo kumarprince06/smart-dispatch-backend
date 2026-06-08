@@ -120,8 +120,38 @@ public class PaymentService {
 
         PaymentProvider.PaymentResult result;
         String publicKey = null;
-        
-        if (request.getProvider() == PaymentMethod.STRIPE) {
+
+        if (request.getProvider() == PaymentMethod.WALLET) {
+            // Wallet — instant deduction, no gateway needed
+            if (customer.getWalletBalance() < order.getDeliveryFee()) {
+                throw new BadRequestException("Insufficient wallet balance. Current: ₹" 
+                    + customer.getWalletBalance() + ", Required: ₹" + order.getDeliveryFee());
+            }
+            customer.setWalletBalance(customer.getWalletBalance() - order.getDeliveryFee());
+            customer.setTotalSpent(customer.getTotalSpent() + order.getDeliveryFee().intValue());
+            customer.setTotalOrders(customer.getTotalOrders() + 1);
+            userRepository.save(customer);
+
+            payment.setStatus(PaymentStatus.SUCCESS);
+            payment.setPaidAt(LocalDateTime.now());
+            order.setStatus(OrderStatus.CONFIRMED);
+            orderRepository.save(order);
+            Payment saved = paymentRepository.save(payment);
+
+            recordLedgerEntry(customer.getId(), order.getDeliveryFee(), "DEBIT",
+                    "PAYMENT", order.getId().toString(), "Wallet payment for order #" + order.getId());
+
+            log.info("[WALLET] Instant payment. TxnID: {}, Amount: ₹{}", saved.getTransactionId(), order.getDeliveryFee());
+
+            return PaymentSessionResponse.builder()
+                    .paymentId(saved.getId())
+                    .transactionId(saved.getTransactionId())
+                    .orderId(order.getId())
+                    .amount(order.getDeliveryFee())
+                    .currency("INR")
+                    .provider("WALLET")
+                    .build();
+        } else if (request.getProvider() == PaymentMethod.STRIPE) {
             result = stripeProvider.processPayment(
                     order.getDeliveryFee(), customer.getId().toString(), order.getId().toString()
             );
